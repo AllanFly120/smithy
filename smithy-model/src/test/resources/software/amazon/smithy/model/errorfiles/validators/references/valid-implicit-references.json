@@ -1,5 +1,5 @@
 {
-    "smithy": "1.0",
+    "smithy": "2.0",
     "shapes": {
         "ns.foo#MyStructure": {
             "type": "structure",
@@ -19,9 +19,6 @@
             },
             "traits": {
                 "smithy.api#references": [
-                    {
-                        "resource": "ns.foo#MyResource"
-                    },
                     {
                         "resource": "ns.foo#MyResource"
                     },
@@ -48,6 +45,9 @@
                 "smithy.api#references": [
                     {
                         "resource": "ns.foo#MyResource"
+                    },
+                    {
+                        "resource": "ns.foo#MyResource2"
                     }
                 ]
             }

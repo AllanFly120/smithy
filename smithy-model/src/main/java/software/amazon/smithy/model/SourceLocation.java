@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model;
 
 import java.util.Objects;
@@ -20,7 +9,7 @@ import java.util.Objects;
 /**
  * Represents the source location of a model component.
  */
-public final class SourceLocation implements FromSourceLocation {
+public final class SourceLocation implements FromSourceLocation, Comparable<SourceLocation> {
 
     public static final SourceLocation NONE = new SourceLocation("N/A");
 
@@ -77,8 +66,8 @@ public final class SourceLocation implements FromSourceLocation {
     @Override
     public String toString() {
         return filename.isEmpty()
-               ? String.format("[%d, %d]", line, column)
-               : String.format("%s [%d, %d]", filename, line, column);
+                ? String.format("[%d, %d]", line, column)
+                : String.format("%s [%d, %d]", filename, line, column);
     }
 
     @Override
@@ -96,5 +85,19 @@ public final class SourceLocation implements FromSourceLocation {
         }
 
         return h;
+    }
+
+    @Override
+    public int compareTo(SourceLocation o) {
+        if (!this.getFilename().equals(o.getFilename())) {
+            return this.getFilename().compareTo(o.getFilename());
+        }
+
+        int lineComparison = Integer.compare(this.getLine(), o.getLine());
+        if (lineComparison != 0) {
+            return lineComparison;
+        }
+
+        return Integer.compare(this.getColumn(), o.getColumn());
     }
 }

@@ -1,5 +1,5 @@
 {
-    "smithy": "1.0",
+    "smithy": "2.0",
     "shapes": {
         "ns.foo#Byte": {
             "type": "byte",
@@ -25,6 +25,23 @@
                 "smithy.api#range": {
                     "min": 10,
                     "max": 20
+                }
+            }
+        },
+        "ns.foo#IntEnum": {
+            "type": "intEnum",
+            "members": {
+                "V1": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": 1
+                    }
+                },
+                "V2": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": 2
+                    }
                 }
             }
         },
@@ -100,7 +117,7 @@
         "ns.foo#String4": {
             "type": "string",
             "traits": {
-                "smithy.api#pattern": "[A-Z]+"
+                "smithy.api#pattern": "^[A-Z]+$"
             }
         },
         "ns.foo#Blob1": {
@@ -133,16 +150,22 @@
                 }
             }
         },
-        "ns.foo#Set": {
-            "type": "set",
+        "ns.foo#UniqueList": {
+            "type": "list",
             "member": {
                 "target": "ns.foo#String"
             },
             "traits": {
-                "smithy.api#length": {
-                    "min": 1,
-                    "max": 2
-                }
+                "smithy.api#uniqueItems": {}
+            }
+        },
+        "ns.foo#SparseList": {
+            "type": "list",
+            "member": {
+                "target": "ns.foo#String"
+            },
+            "traits": {
+                "smithy.api#sparse": {}
             }
         },
         "ns.foo#String": {
@@ -170,6 +193,18 @@
                     "min": 1,
                     "max": 2
                 }
+            }
+        },
+        "ns.foo#SparseMap": {
+            "type": "map",
+            "key": {
+                "target": "ns.foo#KeyString"
+            },
+            "value": {
+                "target": "ns.foo#List"
+            },
+            "traits": {
+                "smithy.api#sparse": {}
             }
         },
         "ns.foo#Structure": {
@@ -266,21 +301,31 @@
         "ns.foo#Structure3": {
             "type": "structure",
             "members": {
-                "optionalInt": {
-                    "target": "smithy.api#PrimitiveInteger"
+                "defaultedInt": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#default": 0
+                    }
                 },
                 "requiredInt": {
-                    "target": "smithy.api#PrimitiveInteger",
+                    "target": "smithy.api#Integer",
                     "traits": {
                         "smithy.api#required": {}
                     }
-                },
-                "requiredInt2": {
-                    "target": "smithy.api#PrimitiveInteger",
+                }
+            }
+        },
+        "ns.foo#Structure4": {
+            "type": "structure",
+            "members": {
+                "httpDate": {
+                    "target": "smithy.api#Timestamp",
                     "traits": {
-                        "smithy.api#required": {},
-                        "smithy.api#box": {}
+                        "smithy.api#timestampFormat": "http-date"
                     }
+                },
+                "httpDateTarget": {
+                    "target": "ns.foo#HttpDate"
                 }
             }
         },

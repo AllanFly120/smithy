@@ -1,25 +1,12 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
 import java.util.Optional;
-import software.amazon.smithy.model.node.BooleanNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
-import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.selector.Selector;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.ToSmithyBuilder;
@@ -40,10 +27,6 @@ import software.amazon.smithy.utils.ToSmithyBuilder;
  */
 public final class IdRefTrait extends AbstractTrait implements ToSmithyBuilder<IdRefTrait> {
     public static final ShapeId ID = ShapeId.from("smithy.api#idRef");
-
-    private static final String SELECTOR_MEMBER_ID = "selector";
-    private static final String FAIL_WHEN_MISSING_MEMBER = "failWhenMissing";
-    private static final String ERROR_MESSAGE = "errorMessage";
 
     private final Selector selector;
     private final boolean failWhenMissing;
@@ -81,11 +64,11 @@ public final class IdRefTrait extends AbstractTrait implements ToSmithyBuilder<I
         ObjectNode.Builder builder = Node.objectNodeBuilder()
                 .sourceLocation(getSourceLocation())
                 .withOptionalMember(
-                        SELECTOR_MEMBER_ID,
+                        "selector",
                         Optional.ofNullable(selector).map(Selector::toString).map(Node::from))
-                .withOptionalMember(ERROR_MESSAGE, getErrorMessage().map(Node::from));
+                .withOptionalMember("errorMessage", getErrorMessage().map(Node::from));
         if (failWhenMissing) {
-            builder = builder.withMember(FAIL_WHEN_MISSING_MEMBER, Node.from(true));
+            builder = builder.withMember("failWhenMissing", Node.from(true));
         }
         return builder.build();
     }
@@ -131,17 +114,13 @@ public final class IdRefTrait extends AbstractTrait implements ToSmithyBuilder<I
         @Override
         public IdRefTrait createTrait(ShapeId target, Node value) {
             Builder builder = builder().sourceLocation(value);
-            ObjectNode objectNode = value.expectObjectNode();
-            objectNode.getStringMember(SELECTOR_MEMBER_ID)
-                    .map(Selector::fromNode)
-                    .ifPresent(builder::selector);
-            objectNode.getBooleanMember(FAIL_WHEN_MISSING_MEMBER)
-                    .map(BooleanNode::getValue)
-                    .ifPresent(builder::failWhenMissing);
-            objectNode.getStringMember(ERROR_MESSAGE)
-                    .map(StringNode::getValue)
-                    .ifPresent(builder::errorMessage);
-            return builder.build();
+            value.expectObjectNode()
+                    .getMember("selector", Selector::fromNode, builder::selector)
+                    .getBooleanMember("failWhenMissing", builder::failWhenMissing)
+                    .getStringMember("errorMessage", builder::errorMessage);
+            IdRefTrait result = builder.build();
+            result.setNodeCache(value);
+            return result;
         }
     }
 }

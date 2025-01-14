@@ -1,24 +1,15 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.build.transforms;
 
+import java.util.List;
 import java.util.logging.Logger;
 import software.amazon.smithy.build.TransformContext;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.ObjectNode;
+import software.amazon.smithy.utils.ListUtils;
 
 /**
  * Helper class used to allow older versions of smithy-build.json files to
@@ -108,22 +99,37 @@ abstract class BackwardCompatHelper<T> extends ConfigurableProjectionTransformer
     abstract String getBackwardCompatibleNameMapping();
 
     @Override
-    public final Model transform(TransformContext context) {
+    public Model transform(TransformContext context) {
+        return super.transform(updateContextIfNecessary(context));
+    }
+
+    @Override
+    public List<String> getAdditionalProjections(TransformContext context) {
+        return getAdditionalProjectionsFunction()
+                // short-circuit updating the context if additional projections are not supported
+                .map(unused -> super.getAdditionalProjections(updateContextIfNecessary(context)))
+                .orElseGet(ListUtils::of);
+
+    }
+
+    private TransformContext updateContextIfNecessary(TransformContext context) {
         ObjectNode original = context.getSettings();
 
         if (!original.getMember(ARGS).isPresent()) {
-            return super.transform(context);
+            return context;
         }
 
         LOGGER.warning(() -> String.format(
                 "Deprecated projection transform arguments detected for `%s`; change this list of strings "
-                + "to an object with a property named `%s`", getName(), getBackwardCompatibleNameMapping()));
+                        + "to an object with a property named `%s`",
+                getName(),
+                getBackwardCompatibleNameMapping()));
 
         ObjectNode updated = original.toBuilder()
                 .withMember(getBackwardCompatibleNameMapping(), original.getMember(ARGS).get())
                 .withoutMember(ARGS)
                 .build();
 
-        return super.transform(context.toBuilder().settings(updated).build());
+        return context.toBuilder().settings(updated).build();
     }
 }

@@ -1,23 +1,9 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.build;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,8 +11,7 @@ import java.util.Optional;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.validation.Severity;
 import software.amazon.smithy.model.validation.ValidationEvent;
-import software.amazon.smithy.utils.ListUtils;
-import software.amazon.smithy.utils.MapUtils;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.SmithyBuilder;
 
 /**
@@ -41,8 +26,8 @@ public final class ProjectionResult {
     private ProjectionResult(Builder builder) {
         this.projectionName = SmithyBuilder.requiredState("projectionName", builder.projectionName);
         this.model = SmithyBuilder.requiredState("model", builder.model);
-        this.events = ListUtils.copyOf(builder.events);
-        this.pluginManifests = MapUtils.copyOf(builder.pluginManifests);
+        this.events = builder.events.copy();
+        this.pluginManifests = builder.pluginManifests.copy();
     }
 
     /**
@@ -78,7 +63,12 @@ public final class ProjectionResult {
      * @return Returns true if the projected model is broken.
      */
     public boolean isBroken() {
-        return events.stream().anyMatch(e -> e.getSeverity() == Severity.ERROR || e.getSeverity() == Severity.DANGER);
+        for (ValidationEvent e : events) {
+            if (e.getSeverity() == Severity.ERROR || e.getSeverity() == Severity.DANGER) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -100,13 +90,16 @@ public final class ProjectionResult {
     }
 
     /**
-     * Gets the result of a specific plugin.
+     * Gets the result of a specific plugin by plugin artifact name.
      *
-     * @param pluginName Name of the plugin to retrieve.
-     * @return Returns the files created by the given plugin or an empty list.
+     * <p>If no artifact name is configured for a plugin in smithy-build.json (e.g., "plugin::artifact"), the
+     * artifact name defaults to the plugin name.
+     *
+     * @param artifactName Name of the plugin artifact to retrieve.
+     * @return Returns files created by the given plugin or an empty list.
      */
-    public Optional<FileManifest> getPluginManifest(String pluginName) {
-        return Optional.ofNullable(pluginManifests.get(pluginName));
+    public Optional<FileManifest> getPluginManifest(String artifactName) {
+        return Optional.ofNullable(pluginManifests.get(artifactName));
     }
 
     /**
@@ -115,8 +108,8 @@ public final class ProjectionResult {
     public static final class Builder implements SmithyBuilder<ProjectionResult> {
         private String projectionName;
         private Model model;
-        private final Map<String, FileManifest> pluginManifests = new HashMap<>();
-        private final Collection<ValidationEvent> events = new ArrayList<>();
+        private final BuilderRef<Map<String, FileManifest>> pluginManifests = BuilderRef.forUnorderedMap();
+        private final BuilderRef<List<ValidationEvent>> events = BuilderRef.forList();
 
         @Override
         public ProjectionResult build() {
@@ -146,14 +139,17 @@ public final class ProjectionResult {
         }
 
         /**
-         * Adds a plugin result.
+         * Adds an artifact result for a plugin.
          *
-         * @param pluginName Name of the plugin.
+         * <p>If no artifact name is configured for a plugin in smithy-build.json (e.g., "plugin::artifact"), the
+         * artifact name defaults to the plugin name.
+         *
+         * @param artifactName Name of the plugin artifact to set.
          * @param manifest File manifest used by the plugin.
          * @return Returns the builder.
          */
-        public Builder addPluginManifest(String pluginName, FileManifest manifest) {
-            pluginManifests.put(pluginName, manifest);
+        public Builder addPluginManifest(String artifactName, FileManifest manifest) {
+            pluginManifests.get().put(artifactName, manifest);
             return this;
         }
 
@@ -164,7 +160,7 @@ public final class ProjectionResult {
          * @return Returns the builder.
          */
         public Builder addEvent(ValidationEvent event) {
-            events.add(Objects.requireNonNull(event));
+            events.get().add(Objects.requireNonNull(event));
             return this;
         }
 

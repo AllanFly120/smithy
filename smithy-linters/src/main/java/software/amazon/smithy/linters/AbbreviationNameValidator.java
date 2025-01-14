@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.linters;
 
 import static java.lang.String.format;
@@ -76,11 +65,20 @@ public final class AbbreviationNameValidator extends AbstractValidator {
     @Override
     public List<ValidationEvent> validate(Model model) {
         return model.shapes()
-                .flatMap(this::validateShapeName)
+                .flatMap(shape -> validateShapeName(model, shape))
                 .collect(Collectors.toList());
     }
 
-    private Stream<ValidationEvent> validateShapeName(Shape shape) {
+    private Stream<ValidationEvent> validateShapeName(Model model, Shape shape) {
+        // Exclude members of enums from AbbreviationName validation,
+        // as they're intended to be CAPS_SNAKE.
+        if (shape.isMemberShape()) {
+            Shape container = model.expectShape(shape.asMemberShape().get().getContainer());
+            if (container.isEnumShape() || container.isIntEnumShape()) {
+                return Stream.empty();
+            }
+        }
+
         String descriptor = shape.isMemberShape() ? "member" : "shape";
         String name = shape.asMemberShape()
                 .map(MemberShape::getMemberName)
@@ -91,9 +89,13 @@ public final class AbbreviationNameValidator extends AbstractValidator {
             return Stream.empty();
         }
 
-        return Stream.of(danger(shape, format(
-                "%s name, `%s`, contains invalid abbreviations. Change this %s name to `%s`",
-                descriptor, name, descriptor, recommendedName)));
+        return Stream.of(danger(shape,
+                format(
+                        "%s name, `%s`, contains invalid abbreviations. Change this %s name to `%s`",
+                        descriptor,
+                        name,
+                        descriptor,
+                        recommendedName)));
     }
 
     private String createRecommendedName(String name) {

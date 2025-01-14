@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.utils;
 
 import java.util.Collections;
@@ -38,7 +27,7 @@ public final class MapUtils {
      * @param <V> the Map's value type
      * @return An immutable Map copy
      */
-    public static <K, V> Map<K, V>  copyOf(Map<? extends K, ? extends V> map) {
+    public static <K, V> Map<K, V> copyOf(Map<? extends K, ? extends V> map) {
         return map.isEmpty() ? Collections.emptyMap() : Collections.unmodifiableMap(new HashMap<>(map));
     }
 
@@ -50,7 +39,7 @@ public final class MapUtils {
      * @param <V> the Map's value type
      * @return An ordered immutable Map copy that maintains the order of the original.
      */
-    public static <K, V> Map<K, V>  orderedCopyOf(Map<? extends K, ? extends V> map) {
+    public static <K, V> Map<K, V> orderedCopyOf(Map<? extends K, ? extends V> map) {
         return map.isEmpty() ? Collections.emptyMap() : Collections.unmodifiableMap(new LinkedHashMap<>(map));
     }
 
@@ -76,9 +65,7 @@ public final class MapUtils {
      * @throws NullPointerException if the key or the value is {@code null}
      */
     public static <K, V> Map<K, V> of(K k1, V v1) {
-        Map<K, V> result = new HashMap<>(1);
-        result.put(k1, v1);
-        return Collections.unmodifiableMap(result);
+        return Collections.singletonMap(k1, v1);
     }
 
     /**
@@ -200,8 +187,20 @@ public final class MapUtils {
      * @throws IllegalArgumentException if there are any duplicate keys
      * @throws NullPointerException if any key or value is {@code null}
      */
-    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5,
-            K k6, V v6) {
+    public static <K, V> Map<K, V> of(
+            K k1,
+            V v1,
+            K k2,
+            V v2,
+            K k3,
+            V v3,
+            K k4,
+            V v4,
+            K k5,
+            V v5,
+            K k6,
+            V v6
+    ) {
         Map<K, V> result = new HashMap<>(6);
         result.put(k1, v1);
         result.put(k2, v2);
@@ -235,8 +234,22 @@ public final class MapUtils {
      * @throws IllegalArgumentException if there are any duplicate keys
      * @throws NullPointerException if any key or value is {@code null}
      */
-    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5,
-            K k6, V v6, K k7, V v7) {
+    public static <K, V> Map<K, V> of(
+            K k1,
+            V v1,
+            K k2,
+            V v2,
+            K k3,
+            V v3,
+            K k4,
+            V v4,
+            K k5,
+            V v5,
+            K k6,
+            V v6,
+            K k7,
+            V v7
+    ) {
         Map<K, V> result = new HashMap<>(7);
         result.put(k1, v1);
         result.put(k2, v2);
@@ -273,8 +286,24 @@ public final class MapUtils {
      * @throws IllegalArgumentException if there are any duplicate keys
      * @throws NullPointerException if any key or value is {@code null}
      */
-    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5,
-            K k6, V v6, K k7, V v7, K k8, V v8) {
+    public static <K, V> Map<K, V> of(
+            K k1,
+            V v1,
+            K k2,
+            V v2,
+            K k3,
+            V v3,
+            K k4,
+            V v4,
+            K k5,
+            V v5,
+            K k6,
+            V v6,
+            K k7,
+            V v7,
+            K k8,
+            V v8
+    ) {
         Map<K, V> result = new HashMap<>(8);
         result.put(k1, v1);
         result.put(k2, v2);
@@ -314,8 +343,26 @@ public final class MapUtils {
      * @throws IllegalArgumentException if there are any duplicate keys
      * @throws NullPointerException if any key or value is {@code null}
      */
-    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5,
-            K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9) {
+    public static <K, V> Map<K, V> of(
+            K k1,
+            V v1,
+            K k2,
+            V v2,
+            K k3,
+            V v3,
+            K k4,
+            V v4,
+            K k5,
+            V v5,
+            K k6,
+            V v6,
+            K k7,
+            V v7,
+            K k8,
+            V v8,
+            K k9,
+            V v9
+    ) {
         Map<K, V> result = new HashMap<>(9);
         result.put(k1, v1);
         result.put(k2, v2);
@@ -358,8 +405,28 @@ public final class MapUtils {
      * @throws IllegalArgumentException if there are any duplicate keys
      * @throws NullPointerException if any key or value is {@code null}
      */
-    public static <K, V> Map<K, V> of(K k1, V v1, K k2, V v2, K k3, V v3, K k4, V v4, K k5, V v5,
-            K k6, V v6, K k7, V v7, K k8, V v8, K k9, V v9, K k10, V v10) {
+    public static <K, V> Map<K, V> of(
+            K k1,
+            V v1,
+            K k2,
+            V v2,
+            K k3,
+            V v3,
+            K k4,
+            V v4,
+            K k5,
+            V v5,
+            K k6,
+            V v6,
+            K k7,
+            V v7,
+            K k8,
+            V v8,
+            K k9,
+            V v9,
+            K k10,
+            V v10
+    ) {
         Map<K, V> result = new HashMap<>(10);
         result.put(k1, v1);
         result.put(k2, v2);
@@ -399,11 +466,17 @@ public final class MapUtils {
     @SafeVarargs
     @SuppressWarnings("varargs")
     public static <K, V> Map<K, V> ofEntries(Map.Entry<? extends K, ? extends V>... entries) {
-        Map<K, V> result = new HashMap<>(entries.length);
-        for (Map.Entry<? extends K, ? extends V> entry : entries) {
-            result.put(entry.getKey(), entry.getValue());
+        if (entries.length == 0) {
+            return MapUtils.of();
+        } else if (entries.length == 1) {
+            return MapUtils.of(entries[0].getKey(), entries[0].getValue());
+        } else {
+            Map<K, V> result = new HashMap<>(entries.length);
+            for (Map.Entry<? extends K, ? extends V> entry : entries) {
+                result.put(entry.getKey(), entry.getValue());
+            }
+            return Collections.unmodifiableMap(result);
         }
-        return Collections.unmodifiableMap(result);
     }
 
     /**

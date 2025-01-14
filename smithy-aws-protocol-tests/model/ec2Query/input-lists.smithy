@@ -1,6 +1,6 @@
 // This file defines test cases that test list query serialization.
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.ec2
 
@@ -42,7 +42,9 @@ apply QueryLists @httpRequestTests([
     },
     {
         id: "Ec2EmptyQueryLists",
-        documentation: "Does not serialize empty query lists",
+        // Empty lists are NOT serialized for the EC2 query protocol, which differs from the AWS query protocol.
+        // See "EmptyQueryLists" for the AWS query protocol equivalent test case.
+        documentation: "Does not serialize empty query lists.",
         protocol: ec2Query,
         method: "POST",
         uri: "/",

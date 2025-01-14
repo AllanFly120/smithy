@@ -1,7 +1,7 @@
 // This file defines test cases that test the basics of empty input and
 // output shape serialization.
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.ec2
 
@@ -43,7 +43,7 @@ apply NoInputAndOutput @httpResponseTests([
         },
         body: """
               <NoInputAndOutputResponse xmlns="https://example.com/">
-                  <RequestId>requestid</RequestId>
+                  <requestId>requestid</requestId>
               </NoInputAndOutputResponse>
               """,
         bodyMediaType: "application/xml",
@@ -87,7 +87,7 @@ apply EmptyInputAndEmptyOutput @httpResponseTests([
         },
         body: """
               <EmptyInputAndEmptyOutputResponse xmlns="https://example.com/">
-                  <RequestId>requestid</RequestId>
+                  <requestId>requestid</requestId>
               </EmptyInputAndEmptyOutputResponse>
               """,
         bodyMediaType: "application/xml",

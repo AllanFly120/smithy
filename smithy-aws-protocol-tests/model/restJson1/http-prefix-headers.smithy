@@ -1,7 +1,7 @@
 // This file defines test cases that test httpPrefix headers.
-// See: https://awslabs.github.io/smithy/1.0/spec/http.html#httpprefixheaders-trait
+// See: https://smithy.io/2.0/spec/http-bindings.html#httpprefixheaders-trait
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson
 
@@ -13,10 +13,10 @@ use aws.protocoltests.shared#StringMap
 /// This examples adds headers to the input of a request and response by prefix.
 @readonly
 @http(uri: "/HttpPrefixHeaders", method: "GET")
-@externalDocumentation("httpPrefixHeaders Trait": "https://awslabs.github.io/smithy/1.0/spec/http.html#httpprefixheaders-trait")
+@externalDocumentation("httpPrefixHeaders Trait": "https://smithy.io/2.0/spec/http-bindings.html#httpprefixheaders-trait")
 operation HttpPrefixHeaders  {
-    input: HttpPrefixHeadersInputOutput,
-    output: HttpPrefixHeadersInputOutput
+    input: HttpPrefixHeadersInput,
+    output: HttpPrefixHeadersOutput
 }
 
 apply HttpPrefixHeaders @httpRequestTests([
@@ -28,32 +28,50 @@ apply HttpPrefixHeaders @httpRequestTests([
         uri: "/HttpPrefixHeaders",
         body: "",
         headers: {
-            "X-Foo": "Foo",
-            "X-Foo-Abc": "Abc value",
-            "X-Foo-Def": "Def value",
+            "x-foo": "Foo",
+            "x-foo-abc": "Abc value",
+            "x-foo-def": "Def value",
         },
         params: {
             foo: "Foo",
             fooMap: {
-                Abc: "Abc value",
-                Def: "Def value",
+                abc: "Abc value",
+                def: "Def value",
             }
         }
     },
     {
         id: "RestJsonHttpPrefixHeadersAreNotPresent",
-        documentation: "No prefix headers are serialized because the value is empty",
+        documentation: "No prefix headers are serialized because the value is not present",
         protocol: restJson1,
         method: "GET",
         uri: "/HttpPrefixHeaders",
         body: "",
         headers: {
-            "X-Foo": "Foo"
+            "x-foo": "Foo"
         },
         params: {
             foo: "Foo",
             fooMap: {}
+        },
+        appliesTo: "client"
+    },
+    {
+        id: "RestJsonHttpPrefixEmptyHeaders",
+        documentation: "Serialize prefix headers were the value is present but empty"
+        protocol: restJson1,
+        method: "GET",
+        uri: "/HttpPrefixHeaders",
+        body: "",
+        params: {
+            fooMap: {
+                abc: ""
+            }
+        },
+        headers: {
+            "x-foo-abc": ""
         }
+        appliesTo: "client",
     },
 ])
 
@@ -64,55 +82,70 @@ apply HttpPrefixHeaders @httpResponseTests([
         protocol: restJson1,
         code: 200,
         headers: {
-            "X-Foo": "Foo",
-            "X-Foo-Abc": "Abc value",
-            "X-Foo-Def": "Def value",
+            "x-foo": "Foo",
+            "x-foo-abc": "Abc value",
+            "x-foo-def": "Def value",
         },
         params: {
             foo: "Foo",
             fooMap: {
-                Abc: "Abc value",
-                Def: "Def value",
+                abc: "Abc value",
+                def: "Def value",
             }
         }
     },
 ])
 
-structure HttpPrefixHeadersInputOutput {
-    @httpHeader("X-Foo")
+@input
+structure HttpPrefixHeadersInput {
+    @httpHeader("x-foo")
     foo: String,
 
-    @httpPrefixHeaders("X-Foo-")
+    @httpPrefixHeaders("x-foo-")
+    fooMap: StringMap,
+}
+
+@output
+structure HttpPrefixHeadersOutput {
+    @httpHeader("x-foo")
+    foo: String,
+
+    @httpPrefixHeaders("x-foo-")
     fooMap: StringMap,
 }
 
 /// Clients that perform this test extract all headers from the response.
 @readonly
 @http(uri: "/HttpPrefixHeadersResponse", method: "GET")
-operation HttpPrefixHeadersResponse  {
-    output: HttpPrefixHeadersResponseOutput
+operation HttpPrefixHeadersInResponse  {
+    input: HttpPrefixHeadersInResponseInput,
+    output: HttpPrefixHeadersInResponseOutput
 }
 
-apply HttpPrefixHeadersResponse @httpResponseTests([
+apply HttpPrefixHeadersInResponse @httpResponseTests([
     {
         id: "HttpPrefixHeadersResponse",
         documentation: "(de)serializes all response headers",
         protocol: restJson1,
         code: 200,
         headers: {
-            "X-Foo": "Foo",
-            "Hello": "Hello"
+            "x-foo": "Foo",
+            "hello": "Hello"
         },
         params: {
             prefixHeaders: {
-                "X-Foo": "Foo",
-                "Hello": "Hello"
+                "x-foo": "Foo",
+                "hello": "Hello"
             }
         }
     },
 ])
 
-structure HttpPrefixHeadersResponseOutput {
+@input
+structure HttpPrefixHeadersInResponseInput {}
+
+@output
+structure HttpPrefixHeadersInResponseOutput {
     @httpPrefixHeaders("")
     prefixHeaders: StringMap,
 }

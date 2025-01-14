@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson
 
@@ -64,7 +64,7 @@ apply MalformedAcceptWithGenericString @httpMalformedRequestTests([
         protocol: restJson1,
         request: {
             method: "POST",
-            uri: "/MalformedAcceptWithPayload",
+            uri: "/MalformedAcceptWithGenericString",
             headers: {
                 // this should be text/plain
                 "accept": "application/json"
@@ -80,27 +80,30 @@ apply MalformedAcceptWithGenericString @httpMalformedRequestTests([
     }
 ])
 
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedAcceptWithBody")
 operation MalformedAcceptWithBody {
     output: GreetingStruct
 }
 
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedAcceptWithPayload")
 operation MalformedAcceptWithPayload {
-    output: MalformedAcceptWithPayloadInput
+    output: MalformedAcceptWithPayloadOutput
 }
 
-structure MalformedAcceptWithPayloadInput {
+structure MalformedAcceptWithPayloadOutput {
     @httpPayload
     payload: JpegBlob
 }
 
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedAcceptWithGenericString")
 operation MalformedAcceptWithGenericString {
-    input: MalformedAcceptWithGenericStringInput
+    output: MalformedAcceptWithGenericStringOutput
 }
 
-structure MalformedAcceptWithGenericStringInput {
+structure MalformedAcceptWithGenericStringOutput {
     @httpPayload
-    payload: Blob
+    payload: String
 }

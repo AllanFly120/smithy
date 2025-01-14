@@ -1,5 +1,5 @@
-// Parse error at line 6, column 6 near `$#`: Expected: '#', but found '$'
-$version: "1.0"
+// Syntax error at line 6, column 6: Expected POUND('#') but found DOLLAR('$') | Model
+$version: "2.0"
 
 namespace smithy.example
 

@@ -1,20 +1,10 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
+import java.util.Objects;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -25,7 +15,6 @@ import software.amazon.smithy.utils.ToSmithyBuilder;
  */
 public final class RetryableTrait extends AbstractTrait implements ToSmithyBuilder<RetryableTrait> {
     public static final ShapeId ID = ShapeId.from("smithy.api#retryable");
-    private static final String THROTTLING = "throttling";
 
     private final boolean throttling;
 
@@ -59,9 +48,27 @@ public final class RetryableTrait extends AbstractTrait implements ToSmithyBuild
     protected Node createNode() {
         ObjectNode.Builder nodeBuilder = Node.objectNodeBuilder().sourceLocation(getSourceLocation());
         if (throttling) {
-            nodeBuilder.withMember(THROTTLING, true);
+            nodeBuilder.withMember("throttling", true);
         }
         return nodeBuilder.build();
+    }
+
+    // Avoid equality issues if, for example, throttling is set explicitly to false.
+    @Override
+    public boolean equals(Object other) {
+        if (!(other instanceof RetryableTrait)) {
+            return false;
+        } else if (other == this) {
+            return true;
+        } else {
+            RetryableTrait ot = (RetryableTrait) other;
+            return throttling == ot.throttling;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(toShapeId(), throttling);
     }
 
     public static final class Provider implements TraitService {
@@ -72,9 +79,11 @@ public final class RetryableTrait extends AbstractTrait implements ToSmithyBuild
 
         @Override
         public RetryableTrait createTrait(ShapeId target, Node value) {
-            ObjectNode node = value.expectObjectNode();
             Builder builder = builder().sourceLocation(value.getSourceLocation());
-            return builder.throttling(node.getBooleanMemberOrDefault(THROTTLING)).build();
+            value.expectObjectNode().getBooleanMember("throttling", builder::throttling);
+            RetryableTrait result = builder.build();
+            result.setNodeCache(value);
+            return result;
         }
     }
 

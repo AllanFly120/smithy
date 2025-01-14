@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.waiters;
 
 import java.util.ArrayList;
@@ -40,6 +29,9 @@ final class WaiterMatcherValidator implements Matcher.Visitor<List<ValidationEve
     private static final String NON_SUPPRESSABLE_ERROR = "WaitableTrait";
     private static final String JMESPATH_PROBLEM = NON_SUPPRESSABLE_ERROR + "JmespathProblem";
     private static final String INVALID_ERROR_TYPE = NON_SUPPRESSABLE_ERROR + "InvalidErrorType";
+    private static final String RETURN_TYPE_MISMATCH = "ReturnTypeMismatch";
+    private static final String JMES_PATH_DANGER = "JmespathEventDanger";
+    private static final String JMES_PATH_WARNING = "JmespathEventWarning";
 
     private final Model model;
     private final OperationShape operation;
@@ -58,37 +50,21 @@ final class WaiterMatcherValidator implements Matcher.Visitor<List<ValidationEve
 
     @Override
     public List<ValidationEvent> visitOutput(Matcher.OutputMember outputPath) {
-        StructureShape struct = OperationIndex.of(model).getOutput(operation).orElse(null);
-        if (struct == null) {
-            addEvent(Severity.ERROR, NON_SUPPRESSABLE_ERROR, "output path used on operation with no output");
-        } else {
-            validatePathMatcher(createCurrentNodeFromShape(struct), outputPath.getValue());
-        }
+        StructureShape struct = OperationIndex.of(model).expectOutputShape(operation);
+        validatePathMatcher(createCurrentNodeFromShape(struct), outputPath.getValue());
         return events;
     }
 
     @Override
     public List<ValidationEvent> visitInputOutput(Matcher.InputOutputMember inputOutputMember) {
         OperationIndex index = OperationIndex.of(model);
-
-        StructureShape input = index.getInput(operation).orElse(null);
-        if (input == null) {
-            addEvent(Severity.ERROR, NON_SUPPRESSABLE_ERROR, "inputOutput path used on operation with no input");
-        }
-
-        StructureShape output = index.getOutput(operation).orElse(null);
-        if (output == null) {
-            addEvent(Severity.ERROR, NON_SUPPRESSABLE_ERROR, "inputOutput path used on operation with no output");
-        }
-
-        if (input != null && output != null) {
-            Map<String, Object> composedMap = new LinkedHashMap<>();
-            composedMap.put("input", createCurrentNodeFromShape(input).expectObjectValue());
-            composedMap.put("output", createCurrentNodeFromShape(output).expectObjectValue());
-            LiteralExpression composedData = new LiteralExpression(composedMap);
-            validatePathMatcher(composedData, inputOutputMember.getValue());
-        }
-
+        StructureShape input = index.expectInputShape(operation);
+        StructureShape output = index.expectOutputShape(operation);
+        Map<String, Object> composedMap = new LinkedHashMap<>();
+        composedMap.put("input", createCurrentNodeFromShape(input).expectObjectValue());
+        composedMap.put("output", createCurrentNodeFromShape(output).expectObjectValue());
+        LiteralExpression composedData = new LiteralExpression(composedMap);
+        validatePathMatcher(composedData, inputOutputMember.getValue());
         return events;
     }
 
@@ -110,9 +86,14 @@ final class WaiterMatcherValidator implements Matcher.Visitor<List<ValidationEve
             }
         }
 
-        addEvent(Severity.WARNING, INVALID_ERROR_TYPE, String.format(
-                "errorType '%s' not found on operation. This operation defines the following errors: %s",
-                error, operation.getErrors()));
+        addEvent(Severity.WARNING,
+                String.format(
+                        "errorType '%s' not found on operation. This operation defines the following errors: %s",
+                        error,
+                        operation.getErrors()),
+                INVALID_ERROR_TYPE,
+                waiterName,
+                String.valueOf(acceptorIndex));
 
         return events;
     }
@@ -130,10 +111,13 @@ final class WaiterMatcherValidator implements Matcher.Visitor<List<ValidationEve
             case BOOLEAN_EQUALS:
                 // A booleanEquals comparator requires an `expected` value of "true" or "false".
                 if (!pathMatcher.getExpected().equals("true") && !pathMatcher.getExpected().equals("false")) {
-                    addEvent(Severity.ERROR, NON_SUPPRESSABLE_ERROR, String.format(
-                            "Waiter acceptors with a %s comparator must set their `expected` value to 'true' or "
-                            + "'false', but found '%s'.",
-                            PathComparator.BOOLEAN_EQUALS, pathMatcher.getExpected()));
+                    addEvent(Severity.ERROR,
+                            String.format(
+                                    "Waiter acceptors with a %s comparator must set their `expected` value to 'true' or "
+                                            + "'false', but found '%s'.",
+                                    PathComparator.BOOLEAN_EQUALS,
+                                    pathMatcher.getExpected()),
+                            NON_SUPPRESSABLE_ERROR);
                 }
                 validateReturnType(pathMatcher.getComparator(), RuntimeType.BOOLEAN, returnType);
                 break;
@@ -154,50 +138,66 @@ final class WaiterMatcherValidator implements Matcher.Visitor<List<ValidationEve
             }
             return result.getReturnType();
         } catch (JmespathException e) {
-            addEvent(Severity.ERROR, NON_SUPPRESSABLE_ERROR, String.format(
-                    "Invalid JMESPath expression (%s): %s", path, e.getMessage()));
+            addEvent(Severity.ERROR,
+                    String.format(
+                            "Invalid JMESPath expression (%s): %s",
+                            path,
+                            e.getMessage()),
+                    NON_SUPPRESSABLE_ERROR);
             return RuntimeType.ANY;
         }
     }
 
     private void validateReturnType(PathComparator comparator, RuntimeType expected, RuntimeType actual) {
         if (actual != RuntimeType.ANY && actual != expected) {
-            addEvent(Severity.DANGER, JMESPATH_PROBLEM, String.format(
-                    "Waiter acceptors with a %s comparator must return a `%s` type, but this acceptor was "
-                    + "statically determined to return a `%s` type.",
-                    comparator, expected, actual));
+            addEvent(Severity.DANGER,
+                    String.format(
+                            "Waiter acceptors with a %s comparator must return a `%s` type, but this acceptor was "
+                                    + "statically determined to return a `%s` type.",
+                            comparator,
+                            expected,
+                            actual),
+                    JMESPATH_PROBLEM,
+                    RETURN_TYPE_MISMATCH,
+                    waiterName,
+                    String.valueOf(acceptorIndex));
         }
     }
 
     // Lint using an ANY type or using the modeled shape as the starting data.
     private LiteralExpression createCurrentNodeFromShape(Shape shape) {
         return shape == null
-               ? LiteralExpression.ANY
-               : new LiteralExpression(shape.accept(new ModelRuntimeTypeGenerator(model)));
+                ? LiteralExpression.ANY
+                : new LiteralExpression(shape.accept(new ModelRuntimeTypeGenerator(model)));
     }
 
     private void addJmespathEvent(String path, ExpressionProblem problem) {
         Severity severity;
+        String eventId;
         switch (problem.severity) {
             case ERROR:
                 severity = Severity.ERROR;
+                eventId = NON_SUPPRESSABLE_ERROR;
                 break;
             case DANGER:
                 severity = Severity.DANGER;
+                eventId = JMESPATH_PROBLEM + "." + JMES_PATH_DANGER + "." + waiterName + "." + acceptorIndex;
                 break;
             default:
                 severity = Severity.WARNING;
+                eventId = JMESPATH_PROBLEM + "." + JMES_PATH_WARNING + "." + waiterName + "." + acceptorIndex;
                 break;
         }
 
         String problemMessage = problem.message + " (" + problem.line + ":" + problem.column + ")";
-        addEvent(severity, severity == Severity.ERROR ? NON_SUPPRESSABLE_ERROR : JMESPATH_PROBLEM, String.format(
-                "Problem found in JMESPath expression (%s): %s", path, problemMessage));
+        addEvent(severity,
+                String.format("Problem found in JMESPath expression (%s): %s", path, problemMessage),
+                eventId);
     }
 
-    private void addEvent(Severity severity, String id, String message) {
+    private void addEvent(Severity severity, String message, String... eventIdParts) {
         events.add(ValidationEvent.builder()
-                .id(id)
+                .id(String.join(".", eventIdParts))
                 .shape(operation)
                 .sourceLocation(waitable)
                 .severity(severity)

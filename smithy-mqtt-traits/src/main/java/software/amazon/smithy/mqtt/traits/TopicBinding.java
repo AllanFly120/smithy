@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.mqtt.traits;
 
 import java.util.Objects;
@@ -45,7 +34,7 @@ import software.amazon.smithy.model.traits.Trait;
  * <h2>@smithy.mqtt#publish topics</h2>
  *
  * Operations marked with {@code @smithy.mqtt#publish} resolve to a single topic that
- * is defined by topic topic property of the trait.
+ * is defined by topic property of the trait.
  *
  * <h2>subscribe topics</h2>
  *
@@ -133,9 +122,20 @@ public final class TopicBinding<T extends Trait> {
      * Gets the input shape related to this operation.
      *
      * @return Returns the optional input shape.
+     * @deprecated Use getInputShape instead.
      */
+    @Deprecated
     public Optional<StructureShape> getInput() {
         return Optional.ofNullable(input);
+    }
+
+    /**
+     * Gets the input shape related to this operation.
+     *
+     * @return Returns the input shape.
+     */
+    public StructureShape getInputShape() {
+        return input;
     }
 
     /**
@@ -192,10 +192,10 @@ public final class TopicBinding<T extends Trait> {
         }
         TopicBinding that = (TopicBinding) o;
         return operation.equals(that.operation)
-               && getInput().equals(that.getInput())
-               && mqttTrait.equals(that.mqttTrait)
-               && getTopic().equals(that.getTopic())
-               && getPayloadShape().equals(that.getPayloadShape());
+                && getInput().equals(that.getInput())
+                && mqttTrait.equals(that.mqttTrait)
+                && getTopic().equals(that.getTopic())
+                && getPayloadShape().equals(that.getPayloadShape());
     }
 
     @Override
@@ -206,11 +206,11 @@ public final class TopicBinding<T extends Trait> {
     @Override
     public String toString() {
         return "TopicBinding{"
-               + "operation=" + operation.getId()
-               + ", input=" + getInput().map(Shape::getId).map(ShapeId::toString).orElse("null")
-               + ", mqttTrait=" + mqttTrait.toShapeId()
-               + ", topic=" + topic
-               + ", payloadShape=" + String.valueOf(payloadShape)
-               + '}';
+                + "operation=" + operation.getId()
+                + ", input=" + getInput().map(Shape::getId).map(ShapeId::toString).orElse("null")
+                + ", mqttTrait=" + mqttTrait.toShapeId()
+                + ", topic=" + topic
+                + ", payloadShape=" + String.valueOf(payloadShape)
+                + '}';
     }
 }

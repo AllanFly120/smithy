@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.json
 
@@ -14,7 +14,7 @@ use smithy.test#httpResponseTests
     cloudFormationName: "JsonProtocol",
     cloudTrailEventSource: "jsonprotocol.amazonaws.com",
 )
-@sigv4(name: "foo")
+@sigv4(name: "jsonprotocol")
 @awsJson1_1
 @title("Sample Json 1.1 Protocol Service")
 service JsonProtocol {
@@ -26,7 +26,9 @@ service JsonProtocol {
         OperationWithOptionalInputOutput,
         PutAndGetInlineDocuments,
         JsonEnums,
+        JsonIntEnums
         NullOperation,
+        SparseNullsOperation,
         GreetingWithErrors,
         JsonUnions,
 
@@ -36,6 +38,16 @@ service JsonProtocol {
 
         // custom endpoints with paths
         HostWithPathOperation,
+
+        // client-only timestamp parsing tests
+        DatetimeOffsets,
+        FractionalSeconds
+
+        // requestCompression trait tests
+        PutWithContentEncoding
+
+        // Content-Type header tests
+        ContentTypeParameters,
     ],
 }
 
@@ -45,8 +57,8 @@ structure SimpleStruct {
     Value: String,
 }
 
-structure StructWithLocationName {
-    @jsonName("RenamedMember")
+structure StructWithJsonName {
+    @jsonName("RenamedMember") // Even if this trait it present, it does not affect serialization for this protocol
     Value: String,
 }
 

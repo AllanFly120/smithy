@@ -1,27 +1,23 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.node;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import software.amazon.smithy.model.SourceLocation;
 
@@ -152,5 +148,144 @@ public class NumberNodeTest {
     @Test
     public void convertsToNumberNode() {
         assertTrue(Node.from(10).asNumberNode().isPresent());
+    }
+
+    @Test
+    public void testsForZero() {
+        Map<Number, Boolean> cases = new HashMap<>();
+        cases.put((byte) 0, true);
+        cases.put((short) 0, true);
+        cases.put(0, true);
+        cases.put(0L, true);
+        cases.put(0.0f, true);
+        cases.put(-0.0f, true);
+        cases.put(0.0d, true);
+        cases.put(-0.0d, true);
+        cases.put(new BigInteger("0"), true);
+        cases.put(new BigInteger("+0"), true);
+        cases.put(new BigInteger("-0"), true);
+        cases.put(new BigDecimal("0"), true);
+        cases.put(new BigDecimal("+0"), true);
+        cases.put(new BigDecimal("-0"), true);
+        cases.put(BigInteger.ZERO, true);
+        cases.put(BigDecimal.ZERO, true);
+        cases.put(new Number() {
+            @Override
+            public int intValue() {
+                return 0;
+            }
+
+            @Override
+            public long longValue() {
+                return 0;
+            }
+
+            @Override
+            public float floatValue() {
+                return 0;
+            }
+
+            @Override
+            public double doubleValue() {
+                return 0;
+            }
+
+            @Override
+            public String toString() {
+                return "0.000";
+            }
+        }, true);
+        cases.put(new Number() {
+            @Override
+            public int intValue() {
+                return 0;
+            }
+
+            @Override
+            public long longValue() {
+                return 0;
+            }
+
+            @Override
+            public float floatValue() {
+                return 0;
+            }
+
+            @Override
+            public double doubleValue() {
+                return 0;
+            }
+
+            @Override
+            public String toString() {
+                return "0.0";
+            }
+        }, true);
+
+        cases.put((byte) 1, false);
+        cases.put((short) 1, false);
+        cases.put(1, false);
+        cases.put(1L, false);
+        cases.put(0.01f, false);
+        cases.put(Float.NaN, false);
+        cases.put(0.01d, false);
+        cases.put(Double.NaN, false);
+        cases.put(new BigInteger("1"), false);
+        cases.put(new BigDecimal("0.01"), false);
+
+        cases.forEach((k, v) -> {
+            boolean result = new NumberNode(k, SourceLocation.NONE).isZero();
+            assertEquals(v, result, "Expected " + k + " to be " + v);
+        });
+    }
+
+    @Test
+    public void compareIntAndShort() {
+        Node left = Node.from(1);
+        Node right = Node.from((short) 1);
+
+        assertThat(left, equalTo(right));
+    }
+
+    @Test
+    public void compareShortAndFloat() {
+        Node left = Node.from((float) 1.0);
+        Node right = Node.from((short) 1);
+
+        assertThat(left, not(equalTo(right)));
+    }
+
+    @Test
+    public void compareByteAndFloat() {
+        Node left = Node.from((float) 1.0);
+        Node right = Node.from((byte) 1);
+
+        assertThat(left, not(equalTo(right)));
+    }
+
+    @Test
+    public void compareDoubleAndBigDecimal() {
+        Node left = Node.from(new BigDecimal("1.0e+10"));
+        Node right = Node.from(1.0e+10);
+
+        assertThat(left, equalTo(right));
+    }
+
+    @Test
+    public void compareDoubleAndFloat() {
+        Node left = Node.from((float) 1.0e+10);
+        Node right = Node.from((double) 1.0e+10);
+
+        assertThat(left, equalTo(right));
+    }
+
+    @Test
+    public void detectsNegativeValues() {
+        assertThat(NumberNode.from(Double.NEGATIVE_INFINITY).isNegative(), is(true));
+        assertThat(NumberNode.from(Double.POSITIVE_INFINITY).isNegative(), is(false));
+        assertThat(NumberNode.from(Double.NaN).isNegative(), is(false));
+        assertThat(NumberNode.from(0).isNegative(), is(false));
+        assertThat(NumberNode.from(1).isNegative(), is(false));
+        assertThat(NumberNode.from(-1).isNegative(), is(true));
     }
 }

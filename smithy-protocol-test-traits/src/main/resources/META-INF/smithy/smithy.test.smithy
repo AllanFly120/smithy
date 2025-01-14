@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace smithy.test
 
@@ -272,19 +272,15 @@ list NonEmptyStringList {
 string NonEmptyString
 
 @private
-@enum([
-    {
-        value: "client",
-        name: "CLIENT",
-        documentation: "The test only applies to client implementations."
-    },
-    {
-        value: "server",
-        name: "SERVER",
-        documentation: "The test only applies to server implementations."
-    },
-])
-string AppliesTo
+enum AppliesTo {
+    /// The test only applies to client implementations.
+    @enumValue("client")
+    CLIENT
+
+    /// The test only applies to server implementations.
+    @enumValue("server")
+    SERVER
+}
 
 /// Define how a malformed HTTP request is rejected by a server given a specific protocol
 @trait(selector: "operation")
@@ -331,7 +327,7 @@ structure HttpMalformedRequestTestCase {
 @private
 structure HttpMalformedRequestDefinition {
 
-    /// The expected serialized HTTP request method.
+    /// The HTTP request method.
     @required
     @length(min: 1)
     method: String,
@@ -358,11 +354,17 @@ structure HttpMalformedRequestDefinition {
     /// percent-encoded, then it MUST appear percent-encoded in this list.
     queryParams: StringList,
 
-    /// Defines a map HTTP headers to include in the request
+    /// Defines a map of HTTP headers to include in the request
     headers: StringMap,
 
     /// The HTTP message body to include in the request
     body: String,
+
+    /// The media type of the `body`.
+    ///
+    /// This is used to help test runners to parse and validate the expected
+    /// data against generated data.
+    bodyMediaType: String
 }
 
 @private

@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.node;
 
 import static java.lang.String.format;
@@ -21,10 +10,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
@@ -32,6 +23,7 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import software.amazon.smithy.model.SourceLocation;
 import software.amazon.smithy.model.validation.ValidationUtils;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.MapUtils;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.ToSmithyBuilder;
@@ -59,8 +51,17 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
                 : Collections.unmodifiableMap(nodeMap);
     }
 
+    private ObjectNode(Builder builder) {
+        super(builder.sourceLocation);
+        this.nodeMap = builder.nodeMap.copy();
+    }
+
     public static ObjectNode fromStringMap(Map<String, String> map) {
         return map.entrySet().stream().collect(collectStringKeys(Map.Entry::getKey, e -> from(e.getValue())));
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     @Override
@@ -213,7 +214,8 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
      * @return Returns the map of matching members.
      */
     public Map<String, Node> getMembersByPrefix(String prefix) {
-        return getStringMap().entrySet().stream()
+        return getStringMap().entrySet()
+                .stream()
                 .filter(entry -> entry.getKey().startsWith(prefix))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
@@ -358,7 +360,7 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
      * @param name Name of the member to get.
      * @return Returns the node with the given member name.
      * @throws IllegalArgumentException when {@code memberName} is null.
-     * @throws ExpectationNotMetException when {@code memberName} is is not
+     * @throws ExpectationNotMetException when {@code memberName} is not
      *  present in the members map.
      */
     public Node expectMember(String name) {
@@ -372,7 +374,7 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
      * @param name Name of the member to get.
      * @param errorMessage The error message to use if the expectation is not met.
      * @return Returns the node with the given member name.
-     * @throws ExpectationNotMetException when {@code memberName} is is not
+     * @throws ExpectationNotMetException when {@code memberName} is not
      *  present in the members map.
      */
     public Node expectMember(String name, String errorMessage) {
@@ -386,7 +388,7 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
      * @param name Name of the member to get.
      * @param errorMessage Error message supplier.
      * @return Returns the node with the given member name.
-     * @throws ExpectationNotMetException when {@code memberName} is is not
+     * @throws ExpectationNotMetException when {@code memberName} is not
      *  present in the members map.
      */
     public Node expectMember(String name, Supplier<String> errorMessage) {
@@ -480,7 +482,8 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
                 additional.removeAll(allowedProperties);
                 throw new ExpectationNotMetException(String.format(
                         "Expected an object with possible properties of %s, but found additional properties: %s",
-                        ValidationUtils.tickedList(allowedProperties), ValidationUtils.tickedList(additional)), this);
+                        ValidationUtils.tickedList(allowedProperties),
+                        ValidationUtils.tickedList(additional)), this);
             }
         }
 
@@ -499,6 +502,176 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
         } catch (ExpectationNotMetException e) {
             LOGGER.warning(e.getMessage() + " (" + getSourceLocation() + ")");
         }
+        return this;
+    }
+
+    /**
+     * Requires that the {@code key} member is present, passes the value through the given {@code mapper}, and then
+     * passes the mapped value to {@code consumer}.
+     *
+     * @param key Key to get from the object.
+     * @param mapper Mapping function used to convert the node value.
+     * @param consumer Consumer to pass the found value to.
+     * @param <T> Mapped value type.
+     * @return Returns the node.
+     */
+    public <T> ObjectNode expectMember(String key, Function<Node, T> mapper, Consumer<T> consumer) {
+        consumer.accept(mapper.apply(expectMember(key)));
+        return this;
+    }
+
+    /**
+     * The same as {@link #expectMember(String, Function, Consumer)}, but the member is optional.
+     *
+     * @param key Key to get from the object.
+     * @param mapper Mapping function used to convert the node value.
+     * @param consumer Consumer to pass the found value to.
+     * @param <T> Mapped value type.
+     * @return Returns the node.
+     */
+    public <T> ObjectNode getMember(String key, Function<Node, T> mapper, Consumer<T> consumer) {
+        getMember(key).map(mapper).ifPresent(consumer);
+        return this;
+    }
+
+    /**
+     * Gets a member and requires it to be an object.
+     *
+     * @param name Name of the member to get.
+     * @param consumer Consumer that accepts the object member.
+     * @return Returns the node.
+     * @throws ExpectationNotMetException when not present or not an object.
+     */
+    public ObjectNode expectObjectMember(String name, Consumer<ObjectNode> consumer) {
+        getObjectMember(name).ifPresent(consumer);
+        return this;
+    }
+
+    /**
+     * Gets the member with the given name, and if present, expects it to be an object.
+     *
+     * @param memberName Name of the member to get.
+     * @param consumer Consumer that accepts the member if found.
+     * @return Returns the node.
+     * @throws ExpectationNotMetException if the member is not an object.
+     */
+    public ObjectNode getObjectMember(String memberName, Consumer<ObjectNode> consumer) {
+        getObjectMember(memberName).ifPresent(consumer);
+        return this;
+    }
+
+    /**
+     * Requires that {@code key} exists, is a string, and passes the value to {@code consumer}.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the string value.
+     * @return Returns the node.
+     */
+    public ObjectNode expectStringMember(String key, Consumer<String> consumer) {
+        consumer.accept(expectStringMember(key).getValue());
+        return this;
+    }
+
+    /**
+     * The same as {@link #expectStringMember(String, Consumer)} but the member is optional.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the string value.
+     * @return Returns the node.
+     */
+    public ObjectNode getStringMember(String key, Consumer<String> consumer) {
+        getStringMember(key).map(StringNode::getValue).ifPresent(consumer);
+        return this;
+    }
+
+    /**
+     * Requires that {@code key} exists, is a boolean, and passes the value to {@code consumer}.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the boolean value.
+     * @return Returns the node.
+     */
+    public ObjectNode expectBooleanMember(String key, Consumer<Boolean> consumer) {
+        consumer.accept(expectBooleanMember(key).getValue());
+        return this;
+    }
+
+    /**
+     * The same as {@link #expectBooleanMember(String, Consumer)} but the member is optional.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the boolean value.
+     * @return Returns the node.
+     */
+    public ObjectNode getBooleanMember(String key, Consumer<Boolean> consumer) {
+        getBooleanMember(key).map(BooleanNode::getValue).ifPresent(consumer);
+        return this;
+    }
+
+    /**
+     * Requires that {@code key} exists, is a number, and passes the value to {@code consumer}.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the number value.
+     * @return Returns the node.
+     */
+    public ObjectNode expectNumberMember(String key, Consumer<Number> consumer) {
+        consumer.accept(expectNumberMember(key).getValue());
+        return this;
+    }
+
+    /**
+     * The same as {@link #expectNumberMember(String, Consumer)} but the member is optional.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the number value.
+     * @return Returns the node.
+     */
+    public ObjectNode getNumberMember(String key, Consumer<Number> consumer) {
+        getNumberMember(key).map(NumberNode::getValue).ifPresent(consumer);
+        return this;
+    }
+
+    /**
+     * Gets the nodes of an optional member that contains an array.
+     *
+     * @param key Key to retrieve.
+     * @param consumer Consumer that accepts the array node value.
+     * @return Returns the node.
+     */
+    public ObjectNode getArrayMember(String key, Consumer<List<Node>> consumer) {
+        getArrayMember(key).ifPresent(array -> consumer.accept(array.getElements()));
+        return this;
+    }
+
+    /**
+     * Requires that the given member exists and is an array; then creates a list of values for the array by passing
+     * array element through the mapping function, and passes that list to the consumer.
+     *
+     * @param k Key to retrieve.
+     * @param map Mapper that takes each array node and returns a mapped value.
+     * @param consumer Consumer that accepts the collected mapped values.
+     * @param <N> Type of Node to expect in each array element.
+     * @param <T> Type of value returned from the mapper.
+     * @return Returns the node.
+     */
+    public <N extends Node, T> ObjectNode expectArrayMember(String k, Function<N, T> map, Consumer<List<T>> consumer) {
+        consumer.accept(expectArrayMember(k).getElementsAs(map));
+        return this;
+    }
+
+    /**
+     * The same as {@link #expectArrayMember(String, Function, Consumer)}, but the member is optional.
+     *
+     * @param k Key to retrieve.
+     * @param map Mapper that takes each array node and returns a mapped value.
+     * @param consumer Consumer that accepts the collected mapped values.
+     * @param <N> Type of Node to expect in each array element.
+     * @param <T> Type of value returned from the mapper.
+     * @return Returns the node.
+     */
+    public <N extends Node, T> ObjectNode getArrayMember(String k, Function<N, T> map, Consumer<List<T>> consumer) {
+        getArrayMember(k).ifPresent(array -> consumer.accept(array.getElementsAs(map)));
         return this;
     }
 
@@ -559,8 +732,7 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
                     return left;
                 },
                 // Use the constructor that doesn't need to re-copy.
-                results -> new ObjectNode(results, SourceLocation.NONE, false)
-        );
+                results -> new ObjectNode(results, SourceLocation.NONE, false));
     }
 
     /**
@@ -597,14 +769,14 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
      * Builder used to efficiently create an ObjectNode.
      */
     public static final class Builder implements SmithyBuilder<ObjectNode> {
-        private final Map<StringNode, Node> nodeMap = new LinkedHashMap<>();
+        private final BuilderRef<Map<StringNode, Node>> nodeMap = BuilderRef.forOrderedMap();
         private SourceLocation sourceLocation = SourceLocation.NONE;
 
         Builder() {}
 
         @Override
         public ObjectNode build() {
-            return new ObjectNode(nodeMap, sourceLocation);
+            return new ObjectNode(this);
         }
 
         public Builder sourceLocation(SourceLocation sourceLocation) {
@@ -612,8 +784,19 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
             return this;
         }
 
+        public boolean hasMember(String key) {
+            if (nodeMap.hasValue()) {
+                for (StringNode k : nodeMap.peek().keySet()) {
+                    if (key.equals(k.getValue())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         public <T extends ToNode> Builder withMember(StringNode key, T value) {
-            nodeMap.put(key, value.toNode());
+            nodeMap.get().put(key, value.toNode());
             return this;
         }
 
@@ -638,13 +821,13 @@ public final class ObjectNode extends Node implements ToSmithyBuilder<ObjectNode
         }
 
         public Builder withoutMember(String memberName) {
-            nodeMap.keySet().removeIf(key -> key.getValue().equals(memberName));
+            nodeMap.get().keySet().removeIf(key -> key.getValue().equals(memberName));
             return this;
         }
 
         public Builder merge(ObjectNode other) {
             for (Map.Entry<StringNode, Node> entry : other.getMembers().entrySet()) {
-                nodeMap.put(entry.getKey(), entry.getValue());
+                nodeMap.get().put(entry.getKey(), entry.getValue());
             }
             return this;
         }

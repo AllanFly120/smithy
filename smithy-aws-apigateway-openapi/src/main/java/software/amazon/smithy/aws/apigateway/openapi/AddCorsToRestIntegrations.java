@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.aws.apigateway.openapi;
 
 import java.util.HashMap;
@@ -38,7 +27,7 @@ import software.amazon.smithy.utils.Pair;
  * integration responses will include a statically computed
  * Access-Control-Expose-Headers CORS headers that contains every header
  * exposed by the integration, and Access-Control-Allow-Credentials header
- * if the operation uses a security scheme that needs it, and and
+ * if the operation uses a security scheme that needs it, and
  * Access-Control-Allow-Origin header that is the result of
  * {@link CorsTrait#getOrigin()}.
  */
@@ -84,7 +73,11 @@ final class AddCorsToRestIntegrations implements ApiGatewayMapper {
             ObjectNode integrationObject
     ) {
         ObjectNode updated = updateIntegrationWithCors(
-                context, operationObject, shape, integrationObject, cors);
+                context,
+                operationObject,
+                shape,
+                integrationObject,
+                cors);
 
         return operationObject.toBuilder()
                 .putExtension(AddIntegrations.INTEGRATION_EXTENSION_NAME, updated)
@@ -112,17 +105,27 @@ final class AddCorsToRestIntegrations implements ApiGatewayMapper {
         }
 
         LOGGER.finer(() -> String.format("Adding the following CORS headers to the API Gateway integration of %s: %s",
-                                         shape.getId(), corsHeaders));
+                shape.getId(),
+                corsHeaders));
         Set<String> deducedHeaders = CorsHeader.deduceOperationResponseHeaders(context, operationObject, shape, cors);
         LOGGER.fine(() -> String.format("Detected the following headers for operation %s: %s",
-                                        shape.getId(), deducedHeaders));
+                shape.getId(),
+                deducedHeaders));
 
         // Update each response by adding CORS headers.
-        responses = responses.getMembers().entrySet().stream()
+        responses = responses.getMembers()
+                .entrySet()
+                .stream()
                 .peek(entry -> LOGGER.fine(() -> String.format(
-                        "Updating integration response %s for `%s` with CORS", entry.getKey(), shape.getId())))
-                .map(entry -> Pair.of(entry.getKey(), updateIntegrationResponse(
-                        shape, corsHeaders, deducedHeaders, entry.getValue().expectObjectNode())))
+                        "Updating integration response %s for `%s` with CORS",
+                        entry.getKey(),
+                        shape.getId())))
+                .map(entry -> Pair.of(entry.getKey(),
+                        updateIntegrationResponse(
+                                shape,
+                                corsHeaders,
+                                deducedHeaders,
+                                entry.getValue().expectObjectNode())))
                 .collect(ObjectNode.collect(Pair::getLeft, Pair::getRight));
 
         return integrationNode.withMember(RESPONSES_KEY, responses);
@@ -138,8 +141,11 @@ final class AddCorsToRestIntegrations implements ApiGatewayMapper {
         ObjectNode responseParams = response.getObjectMember(RESPONSE_PARAMETERS_KEY).orElseGet(Node::objectNode);
 
         // Created a sorted set of all headers exposed in the integration.
-        Set<String> headersToExpose = new TreeSet<>(deduced);
-        responseParams.getStringMap().keySet().stream()
+        Set<String> headersToExpose = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        headersToExpose.addAll(deduced);
+        responseParams.getStringMap()
+                .keySet()
+                .stream()
                 .filter(parameterName -> parameterName.startsWith(HEADER_PREFIX))
                 .map(parameterName -> parameterName.substring(HEADER_PREFIX.length()))
                 .forEach(headersToExpose::add);
@@ -150,7 +156,9 @@ final class AddCorsToRestIntegrations implements ApiGatewayMapper {
         if (!headersToExposeString.isEmpty()) {
             responseHeaders.put(CorsHeader.EXPOSE_HEADERS, headersToExposeString);
             LOGGER.fine(() -> String.format("Adding `%s` header to `%s` with value of `%s`",
-                                            CorsHeader.EXPOSE_HEADERS, shape.getId(), headersToExposeString));
+                    CorsHeader.EXPOSE_HEADERS,
+                    shape.getId(),
+                    headersToExposeString));
         }
 
         if (responseHeaders.isEmpty()) {

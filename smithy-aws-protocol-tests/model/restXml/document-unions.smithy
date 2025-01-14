@@ -1,7 +1,9 @@
 // This file defines test cases that serialize synthesized XML documents
 // in the payload of HTTP requests and responses.
 
-$version: "1.0"
+$version: "2.0"
+$operationInputSuffix: "Request"
+$operationOutputSuffix: "Response"
 
 namespace aws.protocoltests.restxml
 
@@ -14,8 +16,12 @@ use smithy.test#httpResponseTests
 @idempotent
 @http(uri: "/XmlUnions", method: "PUT")
 operation XmlUnions {
-    input: XmlUnionsInputOutput,
-    output: XmlUnionsInputOutput
+    input := {
+        unionValue: XmlUnionShape
+    }
+    output := {
+        unionValue: XmlUnionShape
+    }
 }
 
 apply XmlUnions @httpRequestTests([
@@ -26,7 +32,7 @@ apply XmlUnions @httpRequestTests([
         method: "PUT",
         uri: "/XmlUnions",
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsRequest>
                   <unionValue>
                      <structValue>
                         <stringValue>string</stringValue>
@@ -39,7 +45,7 @@ apply XmlUnions @httpRequestTests([
                         <doubleValue>6.5</doubleValue>
                      </structValue>
                   </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -67,11 +73,11 @@ apply XmlUnions @httpRequestTests([
         method: "PUT",
         uri: "/XmlUnions",
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsRequest>
                  <unionValue>
                     <stringValue>some string</stringValue>
                  </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -90,11 +96,11 @@ apply XmlUnions @httpRequestTests([
         method: "PUT",
         uri: "/XmlUnions",
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsRequest>
                  <unionValue>
                     <booleanValue>true</booleanValue>
                  </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -108,18 +114,18 @@ apply XmlUnions @httpRequestTests([
     },
     {
         id: "XmlUnionsWithUnionMember",
-        documentation: "Serializes union union member",
+        documentation: "Serializes union member",
         protocol: restXml,
         method: "PUT",
         uri: "/XmlUnions",
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsRequest>
                  <unionValue>
                     <unionValue>
                        <booleanValue>true</booleanValue>
                     </unionValue>
                  </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -142,7 +148,7 @@ apply XmlUnions @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsResponse>
                   <unionValue>
                      <structValue>
                         <stringValue>string</stringValue>
@@ -155,7 +161,7 @@ apply XmlUnions @httpResponseTests([
                         <doubleValue>6.5</doubleValue>
                      </structValue>
                   </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -182,11 +188,11 @@ apply XmlUnions @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsResponse>
                  <unionValue>
                     <stringValue>some string</stringValue>
                  </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -204,11 +210,11 @@ apply XmlUnions @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsResponse>
                  <unionValue>
                     <booleanValue>true</booleanValue>
                  </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -222,17 +228,17 @@ apply XmlUnions @httpResponseTests([
     },
     {
         id: "XmlUnionsWithUnionMember",
-        documentation: "Serializes union union member",
+        documentation: "Serializes union member",
         protocol: restXml,
         code: 200,
         body: """
-              <XmlUnionsInputOutput>
+              <XmlUnionsResponse>
                  <unionValue>
                     <unionValue>
                        <booleanValue>true</booleanValue>
                     </unionValue>
                  </unionValue>
-              </XmlUnionsInputOutput>
+              </XmlUnionsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -247,10 +253,6 @@ apply XmlUnions @httpResponseTests([
         }
     },
 ])
-
-structure XmlUnionsInputOutput {
-    unionValue: XmlUnionShape,
-}
 
 union XmlUnionShape {
     stringValue: String,

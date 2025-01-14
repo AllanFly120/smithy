@@ -1,3 +1,7 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.aws.apigateway.traits;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -17,15 +21,18 @@ public class AuthorizersTraitTest {
         TraitFactory factory = TraitFactory.createServiceFactory();
         ShapeId id = ShapeId.from("smithy.example#Foo");
         ObjectNode node = Node.objectNodeBuilder()
-                .withMember("aws.v4", Node.objectNodeBuilder()
-                        .withMember("scheme", "aws.auth#sigv4")
-                        .withMember("type", "request")
-                        .withMember("uri", "arn:foo:baz")
-                        .withMember("credentials", "arn:foo:bar")
-                        .withMember("identitySource", "mapping.expression")
-                        .withMember("identityValidationExpression", "[A-Z]+")
-                        .withMember("resultTtlInSeconds", 100)
-                        .build())
+                .withMember("aws.v4",
+                        Node.objectNodeBuilder()
+                                .withMember("scheme", "aws.auth#sigv4")
+                                .withMember("type", "request")
+                                .withMember("uri", "arn:foo:baz")
+                                .withMember("credentials", "arn:foo:bar")
+                                .withMember("identitySource", "mapping.expression")
+                                .withMember("identityValidationExpression", "[A-Z]+")
+                                .withMember("resultTtlInSeconds", 100)
+                                .withMember("authorizerPayloadFormatVersion", "format.version")
+                                .withMember("enableSimpleResponse", true)
+                                .build())
                 .build();
         Trait trait = factory.createTrait(AuthorizersTrait.ID, id, node).get();
 

@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.aws.cloudformation.schema;
 
 import java.util.Collections;
@@ -21,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import software.amazon.smithy.jsonschema.JsonSchemaConfig;
+import software.amazon.smithy.jsonschema.JsonSchemaVersion;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NodeMapper;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -36,16 +26,26 @@ public final class CfnConfig extends JsonSchemaConfig {
     /** The JSON pointer to where CloudFormation schema shared resource properties should be written. */
     public static final String SCHEMA_COMPONENTS_POINTER = "#/definitions";
 
+    private boolean disableHandlerPermissionGeneration = false;
     private boolean disableDeprecatedPropertyGeneration = false;
+    private boolean disableRequiredPropertyGeneration = false;
     private boolean disableCapitalizedProperties = false;
     private List<String> externalDocs = ListUtils.of(
-            "Documentation Url", "DocumentationUrl", "API Reference", "User Guide",
-            "Developer Guide", "Reference", "Guide");
+            "Documentation Url",
+            "DocumentationUrl",
+            "API Reference",
+            "User Guide",
+            "Developer Guide",
+            "Reference",
+            "Guide");
     private Map<ShapeId, Map<String, Node>> jsonAdd = Collections.emptyMap();
     private String organizationName;
     private String serviceName;
     private List<String> sourceDocs = ListUtils.of(
-            "Source Url", "SourceUrl", "Source", "Source Code");
+            "Source Url",
+            "SourceUrl",
+            "Source",
+            "Source Code");
 
     public CfnConfig() {
         super();
@@ -74,6 +74,10 @@ public final class CfnConfig extends JsonSchemaConfig {
         // https://github.com/aws-cloudformation/cloudformation-cli/blob/master/src/rpdk/core/data/schema/provider.definition.schema.v1.json#L210
         // https://github.com/aws-cloudformation/cloudformation-cli/blob/master/src/rpdk/core/data/schema/provider.definition.schema.v1.json#L166
         super.setUnionStrategy(UnionStrategy.ONE_OF);
+
+        // @cfnResource's additionalSchemas property references shapes that aren't in the service closure
+        // so conversions must be able to reference those shapes
+        super.setEnableOutOfServiceReferences(true);
     }
 
     @Override
@@ -86,6 +90,25 @@ public final class CfnConfig extends JsonSchemaConfig {
             throw new CfnException("CloudFormation Resource Schemas MUST use alphanumeric only "
                     + "references. `alphanumericOnlyRefs` value of `false` was provided.");
         }
+    }
+
+    public boolean getDisableHandlerPermissionGeneration() {
+        return disableHandlerPermissionGeneration;
+    }
+
+    /**
+     * Set to true to disable generating {@code handler} property's {@code permissions}
+     * lists for Resource Schemas.
+     *
+     * <p>By default, handler permissions are automatically added to the {@code handler}
+     * property's {@code permissions} list. This includes the lifecycle operation used
+     * and any permissions listed in the {@code aws.iam#requiredActions} trait.
+     *
+     * @param disableHandlerPermissionGeneration True to disable handler {@code permissions}
+     *   generation
+     */
+    public void setDisableHandlerPermissionGeneration(boolean disableHandlerPermissionGeneration) {
+        this.disableHandlerPermissionGeneration = disableHandlerPermissionGeneration;
     }
 
     public boolean getDisableDeprecatedPropertyGeneration() {
@@ -103,6 +126,23 @@ public final class CfnConfig extends JsonSchemaConfig {
      */
     public void setDisableDeprecatedPropertyGeneration(boolean disableDeprecatedPropertyGeneration) {
         this.disableDeprecatedPropertyGeneration = disableDeprecatedPropertyGeneration;
+    }
+
+    public boolean getDisableRequiredPropertyGeneration() {
+        return disableRequiredPropertyGeneration;
+    }
+
+    /**
+     * Set to true to disable generating {@code required} for Resource Schemas.
+     *
+     * <p>By default, required members are automatically added to the
+     * {@code required} schema property.
+     *
+     * @param disableRequiredPropertyGeneration True to disable {@code required}
+     *   generation, false otherwise.
+     */
+    public void setDisableRequiredPropertyGeneration(boolean disableRequiredPropertyGeneration) {
+        this.disableRequiredPropertyGeneration = disableRequiredPropertyGeneration;
     }
 
     public boolean getDisableCapitalizedProperties() {
@@ -281,7 +321,7 @@ public final class CfnConfig extends JsonSchemaConfig {
     public static CfnConfig fromNode(Node settings) {
         NodeMapper mapper = new NodeMapper();
 
-        mapper.setWhenMissingSetter(NodeMapper.WhenMissing.INGORE);
+        mapper.setWhenMissingSetter(NodeMapper.WhenMissing.IGNORE);
 
         ObjectNode node = settings.expectObjectNode();
         CfnConfig config = new CfnConfig();
@@ -306,5 +346,15 @@ public final class CfnConfig extends JsonSchemaConfig {
         }
 
         return config;
+    }
+
+    @Override
+    public void setJsonSchemaVersion(JsonSchemaVersion schemaVersion) {
+        // CloudFormation Resource Schemas MUST use schema version draft07
+        // https://github.com/aws-cloudformation/cloudformation-cli/blob/master/src/rpdk/core/data/schema/provider.definition.schema.v1.json#L210
+        if (!schemaVersion.equals(JsonSchemaVersion.DRAFT07)) {
+            throw new CfnException(String.format("CloudFormation Resource Schemas require the use of JSON Schema"
+                    + " version draft07. `jsonSchemaVersion` value of `%s` was provided.", schemaVersion));
+        }
     }
 }

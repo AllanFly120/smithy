@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.loader;
 
 import static java.lang.String.format;
@@ -35,14 +24,6 @@ final class MetadataContainer {
     private static final Logger LOGGER = Logger.getLogger(MetadataContainer.class.getName());
 
     private final Map<String, Node> data = new LinkedHashMap<>();
-    private final List<ValidationEvent> events;
-
-    /**
-     * @param events Mutable, by-reference list of validation events.
-     */
-    MetadataContainer(List<ValidationEvent> events) {
-        this.events = events;
-    }
 
     /**
      * Put metadata into the map.
@@ -54,8 +35,9 @@ final class MetadataContainer {
      *
      * @param key Metadata key to set.
      * @param value Value to set.
+     * @param events Where to add events as issues are encountered.
      */
-    void putMetadata(String key, Node value) {
+    void putMetadata(String key, Node value, List<ValidationEvent> events) {
         Node previous = data.putIfAbsent(key, value);
 
         if (previous == null) {
@@ -83,7 +65,9 @@ final class MetadataContainer {
                     .sourceLocation(value)
                     .message(format(
                             "Metadata conflict for key `%s`. Defined in both `%s` and `%s`",
-                            key, value.getSourceLocation(), previous.getSourceLocation()))
+                            key,
+                            value.getSourceLocation(),
+                            previous.getSourceLocation()))
                     .build());
         } else {
             LOGGER.fine(() -> "Ignoring duplicate metadata definition of " + key);

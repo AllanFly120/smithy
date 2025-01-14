@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 metadata validators = [
     {
@@ -21,7 +21,7 @@ metadata validators = [
     {
         // This one is suppressed.
         name: "EmitEachSelector",
-        id: "SuppressedValidator",
+        id: "SuppressedValidator.Foo",
         message: "This is suppressed",
         severity: "WARNING",
         configuration: {
@@ -43,31 +43,37 @@ metadata suppressions = [
         reason: "Please ignore this",
     },
     {
-        id: "SuppressedValidator",
+        id: "SuppressedValidator.Foo",
         namespace: "smithy.example.ignore.this.one", // matches nothing
     },
     {
-        id: "SuppressedValidator",
+        id: "SuppressedValidator.Foo",
         namespace: "smithy.example"
     },
 ]
 
 namespace smithy.example
 
-@suppress(["IngoreMe"])
+@suppress(["IgnoreMe"])
 service MyService {
     version: "XYZ",
     operations: [GetFoo],
 }
 
+@suppress(["IgnoreMe.Too"])
 operation GetFoo {
     input: GetFooInput,
+    output: GetFooOutput
 }
 
+@input
 structure GetFooInput {
     list1: List1,
     list2: List2,
 }
+
+@output
+structure GetFooOutput {}
 
 list List1 {
     member: String,

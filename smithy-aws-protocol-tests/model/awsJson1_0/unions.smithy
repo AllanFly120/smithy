@@ -1,6 +1,6 @@
 // This file defines test cases that serialize unions.
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.json10
 
@@ -11,17 +11,23 @@ use aws.protocoltests.shared#StringList
 use aws.protocoltests.shared#StringMap
 use aws.protocoltests.shared#GreetingStruct
 use aws.protocoltests.shared#FooEnum
+use aws.protocoltests.shared#IntegerEnum
 
 
 /// This operation uses unions for inputs and outputs.
 @idempotent
 operation JsonUnions {
-    input: UnionInputOutput,
-    output: UnionInputOutput,
+    input: JsonUnionsInput,
+    output: JsonUnionsOutput,
 }
 
-/// A shared structure that contains a single union member.
-structure UnionInputOutput {
+@input
+structure JsonUnionsInput {
+    contents: MyUnion
+}
+
+@output
+structure JsonUnionsOutput {
     contents: MyUnion
 }
 
@@ -33,6 +39,7 @@ union MyUnion {
     blobValue: Blob,
     timestampValue: Timestamp,
     enumValue: FooEnum,
+    intEnumValue: IntegerEnum,
     listValue: StringList,
     mapValue: StringMap,
     structureValue: GreetingStruct,
@@ -174,6 +181,29 @@ apply JsonUnions @httpRequestTests([
         params: {
             contents: {
                 enumValue: "Foo"
+            }
+        }
+    },
+    {
+        id: "AwsJson10SerializeIntEnumUnionValue",
+        documentation: "Serializes an intEnum union value",
+        protocol: awsJson1_0,
+        method: "POST",
+        "uri": "/",
+        body: """
+            {
+                "contents": {
+                    "intEnumValue": 1
+                }
+            }""",
+        bodyMediaType: "application/json",
+        headers: {
+            "Content-Type": "application/x-amz-json-1.0",
+            "X-Amz-Target": "JsonRpc10.JsonUnions",
+        },
+        params: {
+            contents: {
+                intEnumValue: 1
             }
         }
     },
@@ -386,6 +416,27 @@ apply JsonUnions @httpResponseTests([
         }
     },
     {
+        id: "AwsJson10DeserializeIntEnumUnionValue",
+        documentation: "Deserializes an intEnum union value",
+        protocol: awsJson1_0,
+        code: 200,
+        body: """
+            {
+                "contents": {
+                    "intEnumValue": 1
+                }
+            }""",
+        bodyMediaType: "application/json",
+        headers: {
+            "Content-Type": "application/x-amz-json-1.0",
+        },
+        params: {
+            contents: {
+                intEnumValue: 1
+            }
+        }
+    },
+    {
         id: "AwsJson10DeserializeListUnionValue",
         documentation: "Deserializes a list union value",
         protocol: awsJson1_0,
@@ -458,4 +509,66 @@ apply JsonUnions @httpResponseTests([
             }
         }
     },
+    {
+        id: "AwsJson10DeserializeIgnoreType"
+        appliesTo: "client"
+        documentation: "Ignores an unrecognized __type property"
+        protocol: awsJson1_0
+        code: 200
+        body: """
+            {
+                "contents": {
+                    "__type": "aws.protocoltests.json10#MyUnion",
+                    "structureValue": {
+                        "hi": "hello"
+                    }
+                }
+            }"""
+        bodyMediaType: "application/json"
+        headers: {
+            "Content-Type": "application/x-amz-json-1.0"
+        },
+        params: {
+            contents: {
+                structureValue: {
+                    hi: "hello"
+                }
+            }
+        }
+    },
+    {
+        id: "AwsJson10DeserializeAllowNulls"
+        appliesTo: "client"
+        documentation: "Allows for `: null` to be set for all unset fields"
+        protocol: awsJson1_0
+        code: 200
+        body: """
+            {
+                "contents": {
+                  "stringValue": null,
+                  "booleanValue": null,
+                  "numberValue": null,
+                  "blobValue": null,
+                  "timestampValue": null,
+                  "enumValue": null,
+                  "intEnumValue": null,
+                  "listValue": null,
+                  "mapValue": null,
+                  "structureValue": {
+                      "hi": "hello"
+                  }
+                }
+            }"""
+        bodyMediaType: "application/json"
+        headers: {
+            "Content-Type": "application/x-amz-json-1.0"
+        },
+        params: {
+            contents: {
+                structureValue: {
+                    hi: "hello"
+                }
+            }
+        }
+    }
 ])

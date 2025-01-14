@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson.validation
 
@@ -7,6 +7,7 @@ use smithy.test#httpMalformedRequestTests
 use smithy.test#httpRequestTests
 use smithy.framework#ValidationException
 
+@suppress(["UnstableTrait"])
 @http(uri: "/RecursiveStructures", method: "POST")
 operation RecursiveStructures {
     input: RecursiveStructuresInput,
@@ -72,8 +73,8 @@ apply RecursiveStructures @httpMalformedRequestTests([
                 mediaType: "application/json",
                 assertion: {
                     contents: """
-                    { "message" : "1 validation error detected. Value XYZ at '/union/union/union/string' failed to satisfy constraint: Member must satisfy enum value set: [abc, def]",
-                      "fieldList" : [{"message": "Value XYZ at '/union/union/union/string' failed to satisfy constraint: Member must satisfy enum value set: [abc, def]", "path": "/union/union/union/string"}]}"""
+                    { "message" : "1 validation error detected. Value at '/union/union/union/string' failed to satisfy constraint: Member must satisfy enum value set: [abc, def]",
+                      "fieldList" : [{"message": "Value at '/union/union/union/string' failed to satisfy constraint: Member must satisfy enum value set: [abc, def]", "path": "/union/union/union/string"}]}"""
                 }
             }
         }
@@ -84,8 +85,10 @@ structure RecursiveStructuresInput {
     union: RecursiveUnionOne
 }
 
-@enum([{value: "abc", name: "ABC"}, {value: "def", name: "DEF"}])
-string RecursiveEnumString
+enum RecursiveEnumString {
+    ABC = "abc"
+    DEF = "def"
+}
 
 union RecursiveUnionOne {
     string: RecursiveEnumString,

@@ -1,36 +1,34 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
-SPHINXBUILD   = python -msphinx
+SPHINXBUILD   = python3 -msphinx
 SPHINXPROJ    = Smithy
-SOURCEDIR     = source
-BUILDDIR      = build
+SHELL         := /bin/bash
 
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
-	@echo "  openhtml    to preview the built index.html"
-
-install:
-	pip install -r requirements.txt .
-	pip install -e .
+install: requirements.txt
+	python3 -m venv build/venv
+	source build/venv/bin/activate && pip3 install -r requirements.txt . && pip3 install -e .
 
 clean:
-	-rm -rf $(BUILDDIR)/*
+	-rm -rf build/* install
 
-install-server:
-	pip install -r requirements-server.txt
+html1:
+	@source build/venv/bin/activate && $(SPHINXBUILD) -M html "source-1.0" "build/1.0" $(SPHINXOPTS) -W --keep-going -n $(O)
 
-serve: clean
-	sphinx-autobuild source build/html
+html2:
+	@source build/venv/bin/activate && $(SPHINXBUILD) -M html "source-2.0" "build/2.0" $(SPHINXOPTS) -W --keep-going -n $(O)
 
-html:
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+html: html2 html1 merge-versions
+
+merge-versions:
+	mkdir -p build/html
+	cp -R "build/1.0/html" "build/html/1.0"
+	cp -R "build/2.0/html" "build/html/2.0"
+	cp -R root/* "build/html"
 
 openhtml:
-	open "$(BUILDDIR)/html/index.html"
+	open "build/html/index.html"
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+dev: install
+	@source build/venv/bin/activate && sphinx-autobuild "source-2.0" "build/2.0" $(SPHINXOPTS) $(O)
 
-.PHONY: help Makefile clean openhtml
+.PHONY: Makefile clean

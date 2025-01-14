@@ -1,7 +1,12 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.jsonschema;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static software.amazon.smithy.utils.FunctionalUtils.alwaysTrue;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -12,6 +17,8 @@ import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
+import software.amazon.smithy.model.traits.PrivateTrait;
+import software.amazon.smithy.model.traits.TraitDefinition;
 
 public class DeconflictingStrategyTest {
     @Test
@@ -26,7 +33,7 @@ public class DeconflictingStrategyTest {
 
         PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
         RefStrategy strategy = RefStrategy
-                .createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy);
+                .createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy, alwaysTrue());
         assertThat(strategy.toPointer(a.getId()), equalTo("#/definitions/Page"));
         assertThat(strategy.toPointer(b.getId()), equalTo("#/definitions/PageComFoo"));
     }
@@ -39,7 +46,7 @@ public class DeconflictingStrategyTest {
         PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
 
         Assertions.assertThrows(ConflictingShapeNameException.class, () -> {
-            RefStrategy.createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy);
+            RefStrategy.createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy, alwaysTrue());
         });
     }
 
@@ -48,8 +55,79 @@ public class DeconflictingStrategyTest {
         Model model = Model.builder().build();
         PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
         RefStrategy strategy = RefStrategy
-                .createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy);
+                .createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy, alwaysTrue());
 
         assertThat(strategy.toPointer(ShapeId.from("com.foo#Nope")), equalTo("#/definitions/Nope"));
+    }
+
+    @Test
+    public void detectsUnitConflictsWhenPreludeUnitIsNotFiltered() {
+        StructureShape a = StructureShape.builder().id("com.foo#Unit").build();
+        Model model = Model.assembler().addShapes(a).assemble().unwrap();
+        PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
+
+        Assertions.assertThrows(ConflictingShapeNameException.class, () -> {
+            RefStrategy.createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy, alwaysTrue());
+        });
+    }
+
+    @Test
+    public void doesNotDetectUnitConflictsWhenPreludeUnitIsFiltered() {
+        StructureShape a = StructureShape.builder().id("com.foo#Unit").build();
+        Model model = Model.assembler().addShapes(a).assemble().unwrap();
+        PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
+
+        RefStrategy.createDefaultStrategy(model,
+                new JsonSchemaConfig(),
+                propertyNamingStrategy,
+                new JsonSchemaConverter.FilterPreludeUnit(false));
+    }
+
+    @Test
+    public void detectsUnitConflictsWithNonPreludeUnitsNoMatterWhat() {
+        StructureShape a = StructureShape.builder().id("com.foo#Unit").build();
+        StructureShape b = StructureShape.builder().id("com.bar#Unit").build();
+        Model model = Model.assembler().addShapes(a, b).assemble().unwrap();
+        PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
+
+        Assertions.assertThrows(ConflictingShapeNameException.class, () -> {
+            RefStrategy.createDefaultStrategy(model,
+                    new JsonSchemaConfig(),
+                    propertyNamingStrategy,
+                    new JsonSchemaConverter.FilterPreludeUnit(false));
+        });
+    }
+
+    @Test
+    public void excludesPrivatePreludeShapes() {
+        StructureShape a = StructureShape.builder().id("com.foo#Severity").build();
+        Model model = Model.assembler().addShapes(a).assemble().unwrap();
+        PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
+        RefStrategy strategy = RefStrategy
+                .createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy, alwaysTrue());
+        assertThat(strategy.toPointer(a.getId()), equalTo("#/definitions/Severity"));
+    }
+
+    @Test
+    public void excludesTraitDefinitions() {
+        StringShape member = StringShape.builder().id("com.foo#String").build();
+        StructureShape matcher = StructureShape.builder()
+                .id("com.foo#Matcher")
+                .addMember("member", member.getId())
+                .build();
+        StructureShape matcherForTrait = StructureShape.builder()
+                .id("com.bar#Matcher")
+                .addTrait(new PrivateTrait())
+                .build();
+        StructureShape trait = StructureShape.builder()
+                .id("com.bar#Trait")
+                .addTrait(TraitDefinition.builder().build())
+                .addMember("matcher", matcherForTrait.toShapeId())
+                .build();
+        Model model = Model.assembler().addShapes(trait, matcherForTrait, matcher, member).assemble().unwrap();
+        PropertyNamingStrategy propertyNamingStrategy = PropertyNamingStrategy.createDefaultStrategy();
+        RefStrategy strategy = RefStrategy
+                .createDefaultStrategy(model, new JsonSchemaConfig(), propertyNamingStrategy, alwaysTrue());
+        assertThat(strategy.toPointer(matcher.getId()), equalTo("#/definitions/Matcher"));
     }
 }

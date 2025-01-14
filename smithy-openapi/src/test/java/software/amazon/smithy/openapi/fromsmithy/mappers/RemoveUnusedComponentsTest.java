@@ -1,3 +1,7 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.openapi.fromsmithy.mappers;
 
 import org.junit.jupiter.api.AfterAll;
@@ -36,7 +40,11 @@ public class RemoveUnusedComponentsTest {
         config.setService(ShapeId.from("smithy.example#Small"));
         OpenApi result = OpenApiConverter.create().config(config).convert(model);
 
-        Assertions.assertTrue(result.getComponents().getSchemas().isEmpty());
+        Assertions.assertFalse(result.getComponents().getSchemas().isEmpty());
+        Assertions.assertTrue(result.getComponents().getSchemas().containsKey("SmallOperationRequestContent"));
+        Assertions.assertTrue(result.getComponents().getSchemas().containsKey("StringMap"));
+        Assertions
+                .assertFalse(result.getComponents().getSchemas().containsKey("SmallOperationExceptionResponseContent"));
     }
 
     @Test
@@ -63,7 +71,8 @@ public class RemoveUnusedComponentsTest {
                     @Override
                     public OpenApi after(Context context, OpenApi openapi) {
                         return openapi.toBuilder()
-                                .components(openapi.getComponents().toBuilder()
+                                .components(openapi.getComponents()
+                                        .toBuilder()
                                         .putSecurityScheme("foo", SecurityScheme.builder().type("apiKey").build())
                                         .build())
                                 .build();

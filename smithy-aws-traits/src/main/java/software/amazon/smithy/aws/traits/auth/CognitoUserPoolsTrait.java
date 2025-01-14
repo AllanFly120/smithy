@@ -1,21 +1,9 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.aws.traits.auth;
 
-import java.util.ArrayList;
 import java.util.List;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.Node;
@@ -25,8 +13,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.AbstractTrait;
 import software.amazon.smithy.model.traits.AbstractTraitBuilder;
 import software.amazon.smithy.model.traits.Trait;
-import software.amazon.smithy.utils.ListUtils;
-import software.amazon.smithy.utils.SmithyBuilder;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 /**
@@ -41,7 +28,7 @@ public final class CognitoUserPoolsTrait extends AbstractTrait implements ToSmit
 
     private CognitoUserPoolsTrait(Builder builder) {
         super(ID, builder.getSourceLocation());
-        this.providerArns = ListUtils.copyOf(SmithyBuilder.requiredState("providerArns", builder.providerArns));
+        this.providerArns = builder.providerArns.copy();
     }
 
     public static final class Provider extends AbstractTrait.Provider {
@@ -52,10 +39,12 @@ public final class CognitoUserPoolsTrait extends AbstractTrait implements ToSmit
         @Override
         public Trait createTrait(ShapeId target, Node value) {
             ObjectNode objectNode = value.expectObjectNode();
-            return builder()
+            CognitoUserPoolsTrait result = builder()
                     .sourceLocation(value)
                     .providerArns(objectNode.expectArrayMember(PROVIDER_ARNS).getElementsAs(StringNode::getValue))
                     .build();
+            result.setNodeCache(objectNode);
+            return result;
         }
     }
 
@@ -90,7 +79,7 @@ public final class CognitoUserPoolsTrait extends AbstractTrait implements ToSmit
 
     /** Builder for {@link CognitoUserPoolsTrait}. */
     public static final class Builder extends AbstractTraitBuilder<CognitoUserPoolsTrait, Builder> {
-        private final List<String> providerArns = new ArrayList<>();
+        private final BuilderRef<List<String>> providerArns = BuilderRef.forList();
 
         private Builder() {}
 
@@ -107,7 +96,7 @@ public final class CognitoUserPoolsTrait extends AbstractTrait implements ToSmit
          */
         public Builder providerArns(List<String> providerArns) {
             clearProviderArns();
-            this.providerArns.addAll(providerArns);
+            this.providerArns.get().addAll(providerArns);
             return this;
         }
 
@@ -118,7 +107,7 @@ public final class CognitoUserPoolsTrait extends AbstractTrait implements ToSmit
          * @return Returns the builder.
          */
         public Builder addProviderArn(String arn) {
-            providerArns.add(arn);
+            providerArns.get().add(arn);
             return this;
         }
 

@@ -1,18 +1,7 @@
 /*
- * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.diff.evaluators;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -55,7 +44,7 @@ public class ChangedPaginatedTraitTest {
                 .removeTraitsIf(model, (shape, trait) -> trait instanceof PaginatedTrait);
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
     }
@@ -65,16 +54,17 @@ public class ChangedPaginatedTraitTest {
         // Remove the items member from the new model.
         Model newModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().items(null).build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().items(null).build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/items` was removed from the `smithy.api#paginated` trait. The removed value was: \"things\""));
+                containsString(
+                        "Removed trait contents from `smithy.api#paginated` at path `/items`. Removed value: `things`"));
     }
 
     @Test
@@ -82,16 +72,16 @@ public class ChangedPaginatedTraitTest {
         // Remove the items member from the old model.
         Model oldModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().items(null).build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().items(null).build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(oldModel, model);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/items` was added to the `smithy.api#paginated` trait with a value of \"things\""));
+                containsString("Added trait contents to `smithy.api#paginated` at path `/items` with value `things`"));
     }
 
     @Test
@@ -99,16 +89,17 @@ public class ChangedPaginatedTraitTest {
         // Change the items value in the new model.
         Model newModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().items("otherThings").build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().items("otherThings").build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/items` was changed on the `smithy.api#paginated` trait from \"things\" to \"otherThings\""));
+                containsString(
+                        "Changed trait contents of `smithy.api#paginated` at path `/items` from `things` to `otherThings`"));
     }
 
     @Test
@@ -116,16 +107,17 @@ public class ChangedPaginatedTraitTest {
         // Remove the pageSize from the new model.
         Model newModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().pageSize(null).build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().pageSize(null).build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/pageSize` was removed from the `smithy.api#paginated` trait. The removed value was: \"maxResults\""));
+                containsString(
+                        "Removed trait contents from `smithy.api#paginated` at path `/pageSize`. Removed value: `maxResults`"));
     }
 
     @Test
@@ -133,12 +125,12 @@ public class ChangedPaginatedTraitTest {
         // Remove the pageSize from the old model, making it detect the addition of a pageSize.
         Model oldModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().pageSize(null).build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().pageSize(null).build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(oldModel, model);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents, empty());
     }
@@ -148,47 +140,50 @@ public class ChangedPaginatedTraitTest {
         // Change the pageSize value in the new model.
         Model newModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().pageSize("otherMaxResults").build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().pageSize("otherMaxResults").build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/pageSize` was changed on the `smithy.api#paginated` trait from \"maxResults\" to \"otherMaxResults\""));
+                containsString(
+                        "Changed trait contents of `smithy.api#paginated` at path `/pageSize` from `maxResults` to `otherMaxResults`"));
     }
 
     @Test
     public void detectsAnyChangeToInputToken() {
         Model newModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().inputToken("otherToken").build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().inputToken("otherToken").build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/inputToken` was changed on the `smithy.api#paginated` trait from \"token\" to \"otherToken\""));
+                containsString(
+                        "Changed trait contents of `smithy.api#paginated` at path `/inputToken` from `token` to `otherToken`"));
     }
 
     @Test
     public void detectsAnyChangeToOutputToken() {
         Model newModel = ModelTransformer.create().mapTraits(model, (shape, trait) -> {
             return trait instanceof PaginatedTrait
-                   ? ((PaginatedTrait) trait).toBuilder().outputToken("otherToken").build()
-                   : trait;
+                    ? ((PaginatedTrait) trait).toBuilder().outputToken("otherToken").build()
+                    : trait;
         });
 
         List<ValidationEvent> events = ModelDiff.compare(model, newModel);
-        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "ModifiedTrait");
+        List<ValidationEvent> changedTraitEvents = TestHelper.findEvents(events, "TraitBreakingChange");
 
         assertThat(changedTraitEvents.size(), equalTo(1));
         assertThat(changedTraitEvents.get(0).getMessage(),
-                   containsString("`/outputToken` was changed on the `smithy.api#paginated` trait from \"token\" to \"otherToken\""));
+                containsString(
+                        "Changed trait contents of `smithy.api#paginated` at path `/outputToken` from `token` to `otherToken`"));
     }
 }

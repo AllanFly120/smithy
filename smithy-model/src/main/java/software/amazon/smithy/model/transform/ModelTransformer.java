@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.transform;
 
 import java.util.ArrayList;
@@ -37,8 +26,10 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ShapeType;
+import software.amazon.smithy.model.traits.EnumTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.TraitDefinition;
+import software.amazon.smithy.model.traits.synthetic.OriginalShapeIdTrait;
 import software.amazon.smithy.utils.FunctionalUtils;
 import software.amazon.smithy.utils.ListUtils;
 
@@ -103,7 +94,7 @@ public final class ModelTransformer {
      * @param shapes Shapes to add or replace in the model.base.
      * @return Returns the transformed model.base.
      */
-    public Model replaceShapes(Model model, Collection<Shape> shapes) {
+    public Model replaceShapes(Model model, Collection<? extends Shape> shapes) {
         if (shapes.isEmpty()) {
             return model;
         }
@@ -119,7 +110,7 @@ public final class ModelTransformer {
      * @param shapes Shapes to add or replace in the model.base.
      * @return Returns the transformed model.base.
      */
-    public Model removeShapes(Model model, Collection<Shape> shapes) {
+    public Model removeShapes(Model model, Collection<? extends Shape> shapes) {
         if (shapes.isEmpty()) {
             return model;
         }
@@ -269,9 +260,10 @@ public final class ModelTransformer {
      * @see #mapShapes(Model, Function) for more information.
      */
     public Model mapTraits(Model model, List<BiFunction<Shape, Trait, Trait>> mappers) {
-        return mapTraits(model, mappers.stream()
-                .reduce((a, b) -> (s, t) -> b.apply(s, a.apply(s, t)))
-                .orElse((s, t) -> t));
+        return mapTraits(model,
+                mappers.stream()
+                        .reduce((a, b) -> (s, t) -> b.apply(s, a.apply(s, t)))
+                        .orElse((s, t) -> t));
     }
 
     /**
@@ -481,6 +473,75 @@ public final class ModelTransformer {
     }
 
     /**
+     * Changes the type of each given shape.
+     *
+     * <p>The following transformations are permitted:
+     *
+     * <ul>
+     *     <li>Any simple type to any simple type</li>
+     *     <li>List to set</li>
+     *     <li>Set to list</li>
+     *     <li>Structure to union</li>
+     *     <li>Union to structure</li>
+     * </ul>
+     *
+     * @param model Model to transform.
+     * @param shapeToType Map of shape IDs to the new type to use for the shape.
+     * @param changeShapeTypeOptions An array of options to enable when changing types.
+     * @return Returns the transformed model.
+     * @throws ModelTransformException if an incompatible type transform is attempted.
+     */
+    public Model changeShapeType(
+            Model model,
+            Map<ShapeId, ShapeType> shapeToType,
+            ChangeShapeTypeOption... changeShapeTypeOptions
+    ) {
+        boolean synthesizeNames = ChangeShapeTypeOption.SYNTHESIZE_ENUM_NAMES.hasFeature(changeShapeTypeOptions);
+        return new ChangeShapeType(shapeToType, synthesizeNames).transform(this, model);
+    }
+
+    /**
+     * Changes each compatible string shape with the enum trait to an enum shape.
+     *
+     * <p>A member will be created on the shape for each entry in the {@link EnumTrait}.
+     *
+     * <p>When the enum definition from the enum trait has been marked as deprecated, or
+     * tagged as "internal", the corresponding enum shape member will be marked with the
+     * DeprecatedTrait or InternalTrait accordingly.
+     *
+     * @param model Model to transform.
+     * @param synthesizeEnumNames Whether enums without names should have names synthesized if possible.
+     * @return Returns the transformed model.
+     */
+    public Model changeStringEnumsToEnumShapes(Model model, boolean synthesizeEnumNames) {
+        return ChangeShapeType.upgradeEnums(model, synthesizeEnumNames).transform(this, model);
+    }
+
+    /**
+     * Changes each compatible string shape with the enum trait to an enum shape.
+     *
+     * <p>A member will be created on the shape for each entry in the {@link EnumTrait}.
+     *
+     * <p>Strings with enum traits that don't define names are not converted.
+     *
+     * @param model Model to transform.
+     * @return Returns the transformed model.
+     */
+    public Model changeStringEnumsToEnumShapes(Model model) {
+        return ChangeShapeType.upgradeEnums(model, false).transform(this, model);
+    }
+
+    /**
+     * Changes each enum shape to a string shape and each intEnum to an integer.
+     *
+     * @param model Model to transform.
+     * @return Returns the transformed model.
+     */
+    public Model downgradeEnums(Model model) {
+        return ChangeShapeType.downgradeEnums(model).transform(this, model);
+    }
+
+    /**
      * Copies the errors defined on the given service onto each operation bound to the
      * service, effectively flattening service error inheritance.
      *
@@ -490,5 +551,176 @@ public final class ModelTransformer {
      */
     public Model copyServiceErrorsToOperations(Model model, ServiceShape forService) {
         return new CopyServiceErrorsToOperationsTransform(forService).transform(this, model);
+    }
+
+    /**
+     * Updates the model so that every operation has a dedicated input shape marked
+     * with the {@code input} trait and output shape marked with the {@code output}
+     * trait, and the targeted shapes all have a consistent shape name of
+     * OperationName + {@code inputSuffix} / {@code outputSuffix} depending on the
+     * context.
+     *
+     * <p>If an operation's input already targets a shape marked with the {@code input}
+     * trait, then the existing input shape is used as input, though the shape will
+     * be renamed if it does not use the given {@code inputSuffix}. If an operation's
+     * output already targets a shape marked with the {@code output} trait, then the
+     * existing output shape is used as output, though the shape will be renamed if it
+     * does not use the given {@code outputSuffix}.
+     *
+     * <p>If the operation's input shape starts with the name of the operation and is
+     * only used throughout the model as the input of the operation, then it is updated
+     * to have the {@code input} trait, and the name remains unaltered.
+     *
+     * <p>If the operation's output shape starts with the name of the operation and is
+     * only used throughout the model as the output of the operation, then it is updated
+     * to have the {@code output} trait, and the name remains unaltered.
+     *
+     * <p>If the operation's input shape does not start with the operation's name or
+     * is used in other places throughout the model, a copy of the targeted input
+     * structure is created, the name of the shape becomes OperationName + {@code inputSuffix},
+     * and the {@code input} trait is added to the shape. The operation is then updated
+     * to target the created shape, and the original shape is left as-is in the model.
+     *
+     * <p>If the operation's output shape does not start with the operation's name or
+     * is used in other places throughout the model, a copy of the targeted output
+     * structure is created, the name of the shape becomes OperationName + {@code outputSuffix},
+     * and the {@code output} trait is added to the shape. The operation is then updated
+     * to target the created shape, and the original shape is left as-is in the model.
+     *
+     * <p>If a naming conflict occurs while attempting to create a new shape, then
+     * the default naming conflict resolver will attempt to name the shape
+     * OperationName + "Operation" + {@code inputSuffix} / {@code outputSuffix}
+     * depending on the context. If the name is <em>still</em> in conflict with other
+     * shapes in the model, then a {@link ModelTransformException} is thrown.
+     *
+     * <p>Any time a shape is renamed, the original shape ID of the shape is captured
+     * on the shape using the synthetic {@link OriginalShapeIdTrait}. This might be
+     * useful for protocols that need to serialize input and output shape names.
+     *
+     * @param model Model to update.
+     * @param inputSuffix Suffix to append to dedicated input shapes (e.g., "Input").
+     * @param outputSuffix Suffix to append to dedicated input shapes (e.g., "Output").
+     * @return Returns the updated model.
+     * @throws ModelTransformException if an input or output shape name conflict occurs.
+     */
+    public Model createDedicatedInputAndOutput(Model model, String inputSuffix, String outputSuffix) {
+        return new CreateDedicatedInputAndOutput(inputSuffix, outputSuffix).transform(this, model);
+    }
+
+    /**
+     * Flattens mixins out of the model and removes them from the model.
+     *
+     * @param model Model to flatten.
+     * @return Returns the flattened model.
+     */
+    public Model flattenAndRemoveMixins(Model model) {
+        return new FlattenAndRemoveMixins().transform(this, model);
+    }
+
+    /**
+     * Add the clientOptional trait to members that are effectively nullable because
+     * they are part of a structure marked with the input trait or they aren't required
+     * and don't have a default trait.
+     *
+     * @param model Model to transform.
+     * @param applyWhenNoDefaultValue Set to true to add clientOptional to members that target
+     *                                shapes with no zero value (e.g., structure and union).
+     * @return Returns the transformed model.
+     */
+    public Model addClientOptional(Model model, boolean applyWhenNoDefaultValue) {
+        return new AddClientOptional(applyWhenNoDefaultValue).transform(this, model);
+    }
+
+    /**
+     * Removes Smithy IDL 2.0 features from a model that are not strictly necessary to keep for consistency with the
+     * rest of Smithy.
+     *
+     * <p>This transformer is lossy, and converts enum shapes to string shapes with the enum trait, intEnum shapes to
+     * integer shapes, flattens and removes mixins, removes properties from resources, and removes default traits that
+     * have no impact on IDL 1.0 semantics (i.e., default traits on structure members set to something other than null,
+     * or default traits on any other shape that are not the zero value of the shape of a 1.0 model).
+     *
+     * @param model Model to downgrade.
+     * @return Returns the downgraded model.
+     */
+    public Model downgradeToV1(Model model) {
+        return new DowngradeToV1().transform(this, model);
+    }
+
+    /**
+     * Remove default traits if the default conflicts with the range trait of the shape.
+     *
+     * @param model Model to transform.
+     * @return Returns the transformed model.
+     */
+    public Model removeInvalidDefaults(Model model) {
+        return new RemoveInvalidDefaults().transform(this, model);
+
+    }
+
+    /**
+     * Deconflicts errors that share a status code.
+     *
+     * @param model Model to transform.
+     * @return Returns the transformed model.
+     */
+    public Model deconflictErrorsWithSharedStatusCode(Model model, ServiceShape forService) {
+        return new DeconflictErrorsWithSharedStatusCode(forService).transform(this, model);
+    }
+
+    /**
+     * Flattens all service-level pagination information into operation-level pagination traits.
+     *
+     * @param model Model to transform.
+     * @return Returns the transformed model.
+     */
+    public Model flattenPaginationInfoIntoOperations(Model model, ServiceShape forService) {
+        return new FlattenPaginationInfo(forService).transform(this, model);
+    }
+
+    /**
+     * Removes any shapes that were deprecated before the specified date.
+     *
+     * <p>The relative date used as a filter should match the ISO 8601 Calendar date format
+     * (i.e. YYYY-MM-DD with optional hyphens).
+     * <p><strong>Note:</strong> Shapes with {@code @deprecated} trait but no {@code since} property are not filtered.
+     *
+     * @param model Model to transform.
+     * @param relativeDate ISO 8601 calendar date to use to filter out deprecated shapes.
+     * @return Returns the transformed model.
+     *
+     * @see <a href="https://www.iso.org/iso-8601-date-and-time-format.html">ISO 8601</a>
+     */
+    public Model filterDeprecatedRelativeDate(Model model, String relativeDate) {
+        return new FilterDeprecatedRelativeDate(relativeDate).transform(this, model);
+    }
+
+    /**
+     * Removes any shapes that were deprecated before the specified version.
+     *
+     * <p>The version used should be a valid Semantic Version (SemVer). For example, {@code 1.2.3.1}.
+     * <p><strong>Note:</strong> Shapes with {@code @deprecated} trait but no {@code since} property are not filtered.
+     *
+     * @param model Model to transform.
+     * @param relativeVersion Semantic Version to use to filter out deprecated shapes.
+     * @return Returns the transformed model.
+     *
+     * @see <a href="https://semver.org/">SemVer</a>
+     */
+    public Model filterDeprecatedRelativeVersion(Model model, String relativeVersion) {
+        return new FilterDeprecatedRelativeVersion(relativeVersion).transform(this, model);
+    }
+
+    /**
+     * Makes any {@code @idempotencyToken} fields {@code @clientOptional} so that missing tokens can be injected.
+     *
+     * <p>Idempotency tokens that are required should fail validation, but shouldn't be required to create a type,
+     * allowing for a default value to be injected when missing.
+     *
+     * @param model Model to transform.
+     * @return Returns the transformed model.
+     */
+    public Model makeIdempotencyTokensClientOptional(Model model) {
+        return MakeIdempotencyTokenClientOptional.transform(model);
     }
 }

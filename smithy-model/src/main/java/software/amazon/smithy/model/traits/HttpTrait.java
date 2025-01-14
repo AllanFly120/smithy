@@ -1,27 +1,13 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
 import java.util.Objects;
 import software.amazon.smithy.model.node.Node;
-import software.amazon.smithy.model.node.NumberNode;
-import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.pattern.UriPattern;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.utils.MapUtils;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 /**
@@ -43,20 +29,19 @@ public final class HttpTrait extends AbstractTrait implements ToSmithyBuilder<Ht
 
     public static final class Provider extends AbstractTrait.Provider {
         public Provider() {
-                super(ID);
+            super(ID);
         }
 
         @Override
         public Trait createTrait(ShapeId target, Node value) {
             HttpTrait.Builder builder = builder().sourceLocation(value);
-            ObjectNode members = value.expectObjectNode();
-            builder.uri(UriPattern.parse(members.expectStringMember("uri").getValue()));
-            builder.method(members.expectStringMember("method").getValue());
-            builder.code(members.getNumberMember("code")
-                                 .map(NumberNode::getValue)
-                                 .map(Number::intValue)
-                                 .orElse(200));
-            return builder.build();
+            value.expectObjectNode()
+                    .expectStringMember("uri", s -> builder.uri(UriPattern.parse(s)))
+                    .expectStringMember("method", builder::method)
+                    .getNumberMember("code", n -> builder.code(n.intValue()));
+            HttpTrait result = builder.build();
+            result.setNodeCache(value);
+            return result;
         }
     }
 
@@ -74,10 +59,12 @@ public final class HttpTrait extends AbstractTrait implements ToSmithyBuilder<Ht
 
     @Override
     protected Node createNode() {
-        return new ObjectNode(MapUtils.of(), getSourceLocation())
+        return Node.objectNodeBuilder()
+                .sourceLocation(getSourceLocation())
                 .withMember("method", Node.from(method))
                 .withMember("uri", Node.from(uri.toString()))
-                .withMember("code", Node.from(code));
+                .withMember("code", Node.from(code))
+                .build();
     }
 
     /**
@@ -90,6 +77,26 @@ public final class HttpTrait extends AbstractTrait implements ToSmithyBuilder<Ht
     @Override
     public HttpTrait.Builder toBuilder() {
         return new Builder().sourceLocation(getSourceLocation()).method(method).uri(uri).code(code);
+    }
+
+    // Avoid inconsequential equality differences based on defaulting code to 200.
+    @Override
+    public boolean equals(Object other) {
+        if (!(other instanceof HttpTrait)) {
+            return false;
+        } else if (other == this) {
+            return true;
+        } else {
+            HttpTrait trait = (HttpTrait) other;
+            return method.equals(trait.method)
+                    && uri.equals(trait.uri)
+                    && code == trait.code;
+        }
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(toShapeId(), method, uri, code);
     }
 
     /**

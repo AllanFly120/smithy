@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace com.amazonaws.apigateway
 
@@ -102,7 +102,6 @@ structure RestApis {
     @jsonName("item")
     items: ListOfRestApi,
 
-    @httpQuery("position")
     position: String,
 }
 
@@ -137,36 +136,19 @@ map MapOfStringToString {
     value: String,
 }
 
-@enum([
-    {
-        value: "HEADER",
-        name: "HEADER",
-    },
-    {
-        value: "AUTHORIZER",
-        name: "AUTHORIZER",
-    },
-])
-string ApiKeySourceType
+enum ApiKeySourceType {
+    HEADER
+    AUTHORIZER
+}
 
 boolean Boolean
-@enum([
-    {
-        value: "REGIONAL",
-        name: "REGIONAL",
-    },
-    {
-        value: "EDGE",
-        name: "EDGE",
-    },
-    {
-        value: "PRIVATE",
-        name: "PRIVATE",
-    },
-])
-string EndpointType
 
-@box
+enum EndpointType {
+    REGIONAL
+    EDGE
+    PRIVATE
+}
+
 integer NullableInteger
 
 string String

@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.openapi.fromsmithy;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -22,6 +11,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +28,7 @@ import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.openapi.OpenApiConfig;
 import software.amazon.smithy.openapi.OpenApiException;
+import software.amazon.smithy.openapi.OpenApiVersion;
 import software.amazon.smithy.openapi.model.OpenApi;
 import software.amazon.smithy.openapi.model.PathItem;
 import software.amazon.smithy.utils.IoUtils;
@@ -125,6 +116,45 @@ public class OpenApiConverterTest {
                 .convert(model);
         Node expectedNode = Node.parse(IoUtils.toUtf8String(
                 getClass().getResourceAsStream("tagged-service-empty-supported-tags.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void preservesUserSpecifiedOrderOfTags() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("tagged-service-order.json"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.example#Service"));
+        config.setTags(true);
+        OpenApi result = OpenApiConverter.create()
+                .config(config)
+                .convert(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("tagged-service-order.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void preservesUserSpecifiedOrderOfTagsWhenFilteringSupportedTags() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("tagged-service-order.json"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.example#Service"));
+        config.setTags(true);
+        config.setSupportedTags(ListUtils.of("one", "two", "three", "four"));
+        OpenApi result = OpenApiConverter.create()
+                .config(config)
+                .convert(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("tagged-service-order-supported-tags.openapi.json")));
 
         Node.assertEquals(result, expectedNode);
     }
@@ -299,7 +329,8 @@ public class OpenApiConverterTest {
     private static final class NullSecurity implements OpenApiMapper {
         @Override
         public Map<String, List<String>> updateSecurity(
-                Context<? extends Trait> context, Shape shape,
+                Context<? extends Trait> context,
+                Shape shape,
                 SecuritySchemeConverter<? extends Trait> converter,
                 Map<String, List<String>> requirement
         ) {
@@ -328,7 +359,8 @@ public class OpenApiConverterTest {
     private static final class ConstantSecurity implements OpenApiMapper {
         @Override
         public Map<String, List<String>> updateSecurity(
-                Context<? extends Trait> context, Shape shape,
+                Context<? extends Trait> context,
+                Shape shape,
                 SecuritySchemeConverter<? extends Trait> converter,
                 Map<String, List<String>> requirement
         ) {
@@ -484,6 +516,22 @@ public class OpenApiConverterTest {
     }
 
     @Test
+    public void convertsExternalDocumentation() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("externaldocs-test.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.example#MyDocs"));
+        Node result = OpenApiConverter.create().config(config).convertToNode(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("externaldocs-test.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
     public void properlyDealsWithServiceRenames() {
         Model model = Model.assembler()
                 .addImport(getClass().getResource("service-with-renames.json"))
@@ -513,5 +561,107 @@ public class OpenApiConverterTest {
                 getClass().getResourceAsStream("service-with-common-errors.openapi.json")));
 
         Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void convertsUnitsThatDoNotConflict() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("nonconflicting-unit.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("example.rest#RestService"));
+        Node result = OpenApiConverter.create().config(config).convertToNode(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("nonconflicting-unit.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void convertsToOpenAPI3_0_2() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("nullability-and-format.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("example#Example"));
+        config.setVersion(OpenApiVersion.VERSION_3_0_2);
+        Node result = OpenApiConverter.create().config(config).convertToNode(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("openapi-3-0-2.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void convertsToOpenAPI3_1_0() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("nullability-and-format.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("example#Example"));
+        config.setVersion(OpenApiVersion.VERSION_3_1_0);
+        Node result = OpenApiConverter.create().config(config).convertToNode(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("openapi-3-1-0.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void removesMixins() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("model-with-mixins.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.example#HasMixin"));
+        config.setProtocol(ShapeId.from("aws.protocols#restJson1"));
+        ObjectNode result = OpenApiConverter.create()
+                .config(config)
+                .convertToNode(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("model-with-mixins.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void convertsMemberDocumentation() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("documentation-test-members.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.example#MyDocs"));
+        config.setVersion(OpenApiVersion.VERSION_3_1_0);
+        config.setAddReferenceDescriptions(true);
+        Node result = OpenApiConverter.create().config(config).convertToNode(model);
+        Node expectedNode = Node.parse(IoUtils.toUtf8String(
+                getClass().getResourceAsStream("documentation-test-members.openapi.json")));
+
+        Node.assertEquals(result, expectedNode);
+    }
+
+    @Test
+    public void convertingMemberDocsRequired3_1() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("documentation-test-members.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.example#MyDocs"));
+        config.setAddReferenceDescriptions(true);
+        OpenApiConverter converter = OpenApiConverter.create().config(config);
+
+        assertThrows(OpenApiException.class, () -> converter.convertToNode(model));
     }
 }

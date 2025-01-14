@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.node;
 
 import static java.lang.String.format;
@@ -78,9 +67,8 @@ public final class NodeMapper {
         /**
          * Ignores unknown properties.
          */
-        INGORE {
-            public void handle(Type into, String pointer, String property, Node value) {
-            }
+        IGNORE {
+            public void handle(Type into, String pointer, String property, Node value) {}
         };
 
         /**
@@ -98,7 +86,10 @@ public final class NodeMapper {
                     ? ""
                     : " " + node.getSourceLocation().toString().trim();
             return format("Deserialization error at %s%s: unable to find setter method for `%s` on %s",
-                          getNormalizedPointer(pointer), location, property, into.getTypeName());
+                    getNormalizedPointer(pointer),
+                    location,
+                    property,
+                    into.getTypeName());
         }
     }
 
@@ -289,7 +280,7 @@ public final class NodeMapper {
     }
 
     /**
-     * Gets whether or not empty arrays and empty objects are omitted from
+     * Gets whether or not false, empty arrays, and empty objects are omitted from
      * serialized POJOs.
      *
      * @return Returns true if empty arrays and POJOs returned from POJO getters are omitted.
@@ -299,9 +290,9 @@ public final class NodeMapper {
     }
 
     /**
-     * Gets whether or not empty arrays and objects are omitted from serialized POJOs.
+     * Gets whether or not false, empty arrays, and empty objects are omitted from serialized POJOs.
      *
-     * @param omitEmptyValues Set to true if empty arrays and objects returned from POJO getters are omitted.
+     * @param omitEmptyValues Set to true if false, empty arrays, and objects returned from POJO getters are omitted.
      */
     public void setOmitEmptyValues(boolean omitEmptyValues) {
         this.omitEmptyValues = omitEmptyValues;
@@ -483,7 +474,7 @@ public final class NodeMapper {
         ParameterizedType type = new ParameterizedType() {
             @Override
             public Type[] getActualTypeArguments() {
-                return new Type[]{members};
+                return new Type[] {members};
             }
 
             @Override
@@ -524,7 +515,7 @@ public final class NodeMapper {
         ParameterizedType type = new ParameterizedType() {
             @Override
             public Type[] getActualTypeArguments() {
-                return new Type[]{String.class, members};
+                return new Type[] {String.class, members};
             }
 
             @Override
@@ -591,7 +582,9 @@ public final class NodeMapper {
     static String createErrorMessage(Type into, String pointer, Node node, String message) {
         String formatted = String.format(
                 "Deserialization error at %s: unable to create %s from %s",
-                getNormalizedPointer(pointer), into.getTypeName(), Node.printJson(node));
+                getNormalizedPointer(pointer),
+                into.getTypeName(),
+                Node.printJson(node));
         if (message != null) {
             formatted += ": " + message;
         }

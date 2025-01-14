@@ -1,28 +1,18 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.aws.cloudformation.schema.model;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NodeMapper;
 import software.amazon.smithy.model.node.ToNode;
-import software.amazon.smithy.utils.ListUtils;
 import software.amazon.smithy.utils.MapUtils;
+import software.amazon.smithy.utils.SetUtils;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
@@ -39,16 +29,21 @@ public final class Handler implements ToNode, ToSmithyBuilder<Handler> {
     public static final String DELETE = "delete";
     public static final String LIST = "list";
     private static final Map<String, Integer> HANDLER_NAME_ORDERS = MapUtils.of(
-            CREATE, 0,
-            READ, 1,
-            UPDATE, 2,
-            DELETE, 3,
-            LIST, 4);
+            CREATE,
+            0,
+            READ,
+            1,
+            UPDATE,
+            2,
+            DELETE,
+            3,
+            LIST,
+            4);
 
-    private final List<String> permissions;
+    private final Set<String> permissions;
 
     private Handler(Builder builder) {
-        this.permissions = ListUtils.copyOf(builder.permissions);
+        this.permissions = SetUtils.orderedCopyOf(builder.permissions);
     }
 
     @Override
@@ -60,7 +55,7 @@ public final class Handler implements ToNode, ToSmithyBuilder<Handler> {
     }
 
     @Override
-    public SmithyBuilder<Handler> toBuilder() {
+    public Builder toBuilder() {
         return builder()
                 .permissions(permissions);
     }
@@ -69,7 +64,7 @@ public final class Handler implements ToNode, ToSmithyBuilder<Handler> {
         return new Builder();
     }
 
-    public List<String> getPermissions() {
+    public Set<String> getPermissions() {
         return permissions;
     }
 
@@ -78,7 +73,7 @@ public final class Handler implements ToNode, ToSmithyBuilder<Handler> {
     }
 
     public static final class Builder implements SmithyBuilder<Handler> {
-        private final List<String> permissions = new ArrayList<>();
+        private final Set<String> permissions = new TreeSet<>();
 
         private Builder() {}
 
@@ -87,7 +82,7 @@ public final class Handler implements ToNode, ToSmithyBuilder<Handler> {
             return new Handler(this);
         }
 
-        public Builder permissions(List<String> permissions) {
+        public Builder permissions(Collection<String> permissions) {
             this.permissions.clear();
             this.permissions.addAll(permissions);
             return this;

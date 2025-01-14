@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
 import java.util.stream.Stream;
@@ -62,6 +51,21 @@ public interface Trait extends FromSourceLocation, ToNode, ToShapeId {
     ShapeId toShapeId();
 
     /**
+     * Checks if this trait is persisted with the shape, or if it is a
+     * synthetic, or transient trait, only meant to temporarily aid in
+     * some kind of in-memory model transformation.
+     *
+     * <p>Because synthetic traits are not persisted with shapes, they also
+     * do not need to be defined in Smithy's semantic model before they can
+     * be used in the model.
+     *
+     * @return Returns true if the trait is not persisted on the shape.
+     */
+    default boolean isSynthetic() {
+        return false;
+    }
+
+    /**
      * Used in a stream flatMapStream to return a {@link Stream} with a
      * {@link Pair} of Shape and Trait if the trait is present on the
      * given shape.
@@ -93,8 +97,8 @@ public interface Trait extends FromSourceLocation, ToNode, ToShapeId {
      */
     static String getIdiomaticTraitName(String traitName) {
         return traitName.startsWith("smithy.api#")
-               ? traitName.substring("smithy.api#".length())
-               : traitName;
+                ? traitName.substring("smithy.api#".length())
+                : traitName;
     }
 
     /**

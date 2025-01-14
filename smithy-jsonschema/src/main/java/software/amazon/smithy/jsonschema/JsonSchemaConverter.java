@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.jsonschema;
 
 import java.util.ArrayList;
@@ -33,6 +22,8 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ToShapeId;
+import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.utils.FunctionalUtils;
 import software.amazon.smithy.utils.Pair;
@@ -63,11 +54,19 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
     private final String rootDefinitionPointer;
     private final int rootDefinitionSegments;
 
+    /** A workaround for including definitions for Unit; it's only included in the schema if a union targets it. */
+    private final boolean unitTargetedByUnion;
+
     private JsonSchemaConverter(Builder builder) {
         mappers.addAll(builder.mappers);
         config = SmithyBuilder.requiredState("config", builder.config);
         propertyNamingStrategy = SmithyBuilder.requiredState("propertyNamingStrategy", builder.propertyNamingStrategy);
-        model = SmithyBuilder.requiredState("model", builder.model);
+
+        // Flatten mixins out of the model before using the model at all. Mixins are
+        // not relevant to JSON Schema documents.
+        Model builderModel = SmithyBuilder.requiredState("model", builder.model);
+        model = ModelTransformer.create().flattenAndRemoveMixins(builderModel);
+
         shapePredicate = builder.shapePredicate;
 
         LOGGER.fine("Building filtered JSON schema shape index");
@@ -81,7 +80,17 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
         }
 
         LOGGER.fine("Creating JSON ref strategy");
-        refStrategy = RefStrategy.createDefaultStrategy(model, config, propertyNamingStrategy);
+        Model refModel = config.isEnableOutOfServiceReferences()
+                ? this.model
+                : scopeModelToService(model, config.getService());
+
+        unitTargetedByUnion = refModel.shapes(UnionShape.class)
+                .anyMatch(u -> u.members().stream().anyMatch(m -> m.getTarget().equals(UnitTypeTrait.UNIT)));
+
+        refStrategy = RefStrategy.createDefaultStrategy(refModel,
+                config,
+                propertyNamingStrategy,
+                new FilterPreludeUnit(unitTargetedByUnion));
 
         // Combine custom mappers with the discovered mappers and sort them.
         realizedMappers = new ArrayList<>(mappers);
@@ -92,13 +101,13 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
                 .map(Object::getClass)
                 .map(Class::getCanonicalName)
                 .collect(Collectors.joining(", ")));
-        visitor = new JsonSchemaShapeVisitor(model, this, realizedMappers);
+        visitor = new JsonSchemaShapeVisitor(this.model, this, realizedMappers);
 
         // Compute the number of segments in the root definition section.
         rootDefinitionPointer = config.getDefinitionPointer();
         rootDefinitionSegments = countSegments(rootDefinitionPointer);
         LOGGER.fine(() -> "Using the following root JSON schema pointer: " + rootDefinitionPointer
-                          + " (" + rootDefinitionSegments + " segments)");
+                + " (" + rootDefinitionSegments + " segments)");
     }
 
     private static Model createUpdatedModel(
@@ -124,6 +133,14 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
         model = transformer.scrubTraitDefinitions(model);
 
         return model;
+    }
+
+    private static Model scopeModelToService(Model model, ShapeId serviceId) {
+        if (serviceId == null) {
+            return model;
+        }
+        Set<Shape> connected = new Walker(model).walkShapes(model.expectShape(serviceId));
+        return ModelTransformer.create().filterShapes(model, connected::contains);
     }
 
     private static int countSegments(String pointer) {
@@ -197,7 +214,7 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
      */
     public boolean isTopLevelPointer(String pointer) {
         return pointer.startsWith(rootDefinitionPointer)
-               && countSegments(pointer) == rootDefinitionSegments + 1;
+                && countSegments(pointer) == rootDefinitionSegments + 1;
     }
 
     /**
@@ -240,7 +257,7 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
                 // Don't convert unsupported shapes.
                 .filter(FunctionalUtils.not(this::isUnsupportedShapeType))
                 // Ignore prelude shapes.
-                .filter(FunctionalUtils.not(Prelude::isPreludeShape))
+                .filter(s -> s.getId().equals(UnitTypeTrait.UNIT) && unitTargetedByUnion || !Prelude.isPreludeShape(s))
                 // Do not generate inlined shapes in the definitions map.
                 .filter(FunctionalUtils.not(refStrategy::isInlined))
                 // Create a pair of pointer and shape.
@@ -399,6 +416,19 @@ public final class JsonSchemaConverter implements ToSmithyBuilder<JsonSchemaConv
             mappers.clear();
             mappers.addAll(jsonSchemaMappers);
             return this;
+        }
+    }
+
+    static final class FilterPreludeUnit implements Predicate<Shape> {
+        private final boolean includePreludeUnit;
+
+        FilterPreludeUnit(boolean includePreludeUnit) {
+            this.includePreludeUnit = includePreludeUnit;
+        }
+
+        @Override
+        public boolean test(Shape shape) {
+            return includePreludeUnit || !shape.getId().equals(UnitTypeTrait.UNIT);
         }
     }
 }

@@ -1,3 +1,7 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.openapi.fromsmithy.protocols;
 
 import static org.junit.jupiter.api.Assertions.fail;
@@ -139,43 +143,36 @@ public class AwsRestJson1ProtocolTest {
                                 "X-Amz-User-Agent",
                                 "X-Amzn-Trace-Id",
                                 "Amz-Sdk-Request",
-                                "Amz-Sdk-Invocation-Id"
-                        ),
+                                "Amz-Sdk-Invocation-Id"),
                         SetUtils.of(
                                 "X-Amzn-Requestid",
-                                "X-Amzn-Errortype"
-                        )
-                ),
+                                "X-Amzn-Errortype",
+                                "Content-Length",
+                                "Content-Type")),
                 Arguments.of(
                         "EmptyInputAndOutput",
                         SetUtils.of(
                                 "X-Amz-User-Agent",
                                 "X-Amzn-Trace-Id",
                                 "Amz-Sdk-Request",
-                                "Amz-Sdk-Invocation-Id"
-                        ),
+                                "Amz-Sdk-Invocation-Id"),
                         SetUtils.of(
                                 "X-Amzn-Requestid",
                                 "X-Amzn-Errortype",
                                 "Content-Length",
-                                "Content-Type"
-                        )
-                ),
+                                "Content-Type")),
                 Arguments.of(
                         "OnlyErrorOutput",
                         SetUtils.of(
                                 "X-Amz-User-Agent",
                                 "X-Amzn-Trace-Id",
                                 "Amz-Sdk-Request",
-                                "Amz-Sdk-Invocation-Id"
-                        ),
+                                "Amz-Sdk-Invocation-Id"),
                         SetUtils.of(
                                 "X-Amzn-Requestid",
                                 "X-Amzn-Errortype",
                                 "Content-Length",
-                                "Content-Type"
-                        )
-                ),
+                                "Content-Type")),
                 Arguments.of(
                         "HttpChecksumRequired",
                         SetUtils.of(
@@ -183,43 +180,12 @@ public class AwsRestJson1ProtocolTest {
                                 "X-Amzn-Trace-Id",
                                 "Amz-Sdk-Request",
                                 "Amz-Sdk-Invocation-Id",
-                                "Content-Md5"
-                        ),
-                        SetUtils.of(
-                                "X-Amzn-Requestid",
-                                "X-Amzn-Errortype"
-                        )
-                ),
-                Arguments.of(
-                        "HttpChecksumInputOperation",
-                        SetUtils.of(
-                                "X-Amz-User-Agent",
-                                "X-Amzn-Trace-Id",
-                                "Amz-Sdk-Request",
-                                "Amz-Sdk-Invocation-Id",
-                                "x-amz-checksum-sha256"
-                        ),
-                        SetUtils.of(
-                                "X-Amzn-Requestid",
-                                "X-Amzn-Errortype"
-                        )
-                ),
-                Arguments.of(
-                        "HttpChecksumOutputOperation",
-                        SetUtils.of(
-                                "X-Amz-User-Agent",
-                                "X-Amzn-Trace-Id",
-                                "Amz-Sdk-Request",
-                                "Amz-Sdk-Invocation-Id"
-                        ),
+                                "Content-Md5"),
                         SetUtils.of(
                                 "X-Amzn-Requestid",
                                 "X-Amzn-Errortype",
                                 "Content-Length",
-                                "Content-Type",
-                                "x-amz-checksum-sha256"
-                        )
-                ),
+                                "Content-Type")),
                 Arguments.of(
                         "HasDiscoveredEndpoint",
                         SetUtils.of(
@@ -227,20 +193,17 @@ public class AwsRestJson1ProtocolTest {
                                 "X-Amzn-Trace-Id",
                                 "Amz-Sdk-Request",
                                 "Amz-Sdk-Invocation-Id",
-                                "X-Amz-Api-Version"
-                        ),
+                                "X-Amz-Api-Version"),
                         SetUtils.of(
                                 "X-Amzn-Requestid",
                                 "X-Amzn-Errortype",
                                 "Content-Length",
-                                "Content-Type"
-                        )
-                )
-        );
+                                "Content-Type")));
     }
 
     @ParameterizedTest
     @MethodSource("protocolHeaderCases")
+    @SuppressWarnings("unchecked")
     public void assertProtocolHeaders(
             String operationId,
             Set<String> expectedRequestHeaders,
@@ -257,7 +220,8 @@ public class AwsRestJson1ProtocolTest {
 
         AwsRestJson1Protocol protocol = new AwsRestJson1Protocol();
         OperationShape operation = model.expectShape(
-                ShapeId.fromParts("smithy.example", operationId), OperationShape.class);
+                ShapeId.fromParts("smithy.example", operationId),
+                OperationShape.class);
 
         ContextCapturingMapper contextCaptor = new ContextCapturingMapper();
         OpenApiConverter.create()
@@ -285,11 +249,61 @@ public class AwsRestJson1ProtocolTest {
 
         @Override
         public OperationObject updateOperation(
-                Context<? extends Trait> context, OperationShape shape, OperationObject operation,
-                String httpMethodName, String path
+                Context<? extends Trait> context,
+                OperationShape shape,
+                OperationObject operation,
+                String httpMethodName,
+                String path
         ) {
             this.capturedContext = context;
             return OpenApiMapper.super.updateOperation(context, shape, operation, httpMethodName, path);
+        }
+    }
+
+    @Test
+    public void convertsExamples() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("examples-test.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("smithy.examplestrait#Banking"));
+        ObjectNode result = OpenApiConverter.create()
+                .config(config)
+                .convertToNode(model);
+        InputStream openApiStream = getClass().getResourceAsStream("examples-test.openapi.json");
+
+        if (openApiStream == null) {
+            throw new RuntimeException("OpenAPI model not found for test case: examples-test.openapi.json");
+        } else {
+            Node expectedNode = Node.parse(IoUtils.toUtf8String(openApiStream));
+            Node.assertEquals(result, expectedNode);
+        }
+    }
+
+    @Test
+    public void combinesErrorsWithSameStatusCode() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("error-code-collision-test.smithy"))
+                .discoverModels()
+                .assemble()
+                .unwrap();
+        OpenApiConfig config = new OpenApiConfig();
+        config.setService(ShapeId.from("example#Example"));
+        config.setOnErrorStatusConflict(OpenApiConfig.ErrorStatusConflictHandlingStrategy.ONE_OF);
+        ObjectNode result = OpenApiConverter.create()
+                .config(config)
+                .convertToNode(model);
+        InputStream openApiStream = getClass()
+                .getResourceAsStream("error-code-collision-test-use-oneof.openapi.json");
+
+        if (openApiStream == null) {
+            throw new RuntimeException("OpenAPI model not found for test case: "
+                    + "error-code-collision-test-use-properties.openapi.json");
+        } else {
+            Node expectedNode = Node.parse(IoUtils.toUtf8String(openApiStream));
+            Node.assertEquals(result, expectedNode);
         }
     }
 }

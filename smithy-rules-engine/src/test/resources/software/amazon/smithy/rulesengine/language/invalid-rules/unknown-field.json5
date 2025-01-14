@@ -1,0 +1,42 @@
+// when parsing endpoint ruleset
+// while typechecking
+//   at invalid-rules/unknown-field.json5:24
+// while typechecking the endpoint
+//   at invalid-rules/unknown-field.json5:36
+// while checking the URL
+//   at invalid-rules/unknown-field.json5:37
+// while typechecking "{partitionResult#nme}.amazonaws.com"
+// while typechecking the template `"{partitionResult#nme}.amazonaws.com"`
+// while checking {partitionResult#nme}
+// while typechecking partitionResult#nme
+// while resolving nme in {scheme=StringType, authority=StringType, path=StringType, normalizedPath=StringType, isIp=BooleanType}
+// {scheme=StringType, authority=StringType, path=StringType, normalizedPath=StringType, isIp=BooleanType} does not contain field nme
+{
+  "version": "1.2",
+  "parameters": {
+    "region": {
+      "type": "string",
+      "builtIn": "AWS::Region",
+      "required": true
+    }
+  },
+  "rules": [
+    {
+      "conditions": [
+        {
+          "fn": "parseURL",
+          "argv": [
+            {
+              "ref": "region"
+            }
+          ],
+          "assign": "partitionResult"
+        }
+      ],
+      "endpoint": {
+        "url": "{partitionResult#nme}.amazonaws.com"
+      },
+      "type": "endpoint"
+    }
+  ]
+}

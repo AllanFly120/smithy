@@ -1,31 +1,26 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.cli.commands;
 
-import java.util.List;
+import java.util.logging.Logger;
+import software.amazon.smithy.build.model.SmithyBuildConfig;
 import software.amazon.smithy.cli.Arguments;
-import software.amazon.smithy.cli.Colors;
 import software.amazon.smithy.cli.Command;
-import software.amazon.smithy.cli.Parser;
-import software.amazon.smithy.cli.SmithyCli;
-import software.amazon.smithy.utils.SetUtils;
-import software.amazon.smithy.utils.SmithyInternalApi;
+import software.amazon.smithy.cli.dependencies.DependencyResolver;
 
-@SmithyInternalApi
-public final class ValidateCommand implements Command {
+final class ValidateCommand implements Command {
+
+    private static final Logger LOGGER = Logger.getLogger(ValidateCommand.class.getName());
+    private final String parentCommandName;
+    private final DependencyResolver.Factory dependencyResolverFactory;
+
+    ValidateCommand(String parentCommandName, DependencyResolver.Factory dependencyResolverFactory) {
+        this.parentCommandName = parentCommandName;
+        this.dependencyResolverFactory = dependencyResolverFactory;
+    }
+
     @Override
     public String getName() {
         return "validate";
@@ -33,27 +28,34 @@ public final class ValidateCommand implements Command {
 
     @Override
     public String getSummary() {
-        return "Validates Smithy models";
+        return "Validates Smithy models.";
     }
 
     @Override
-    public Parser getParser() {
-        return Parser.builder()
-                .option(SmithyCli.ALLOW_UNKNOWN_TRAITS, "Ignores unknown traits when validating models")
-                .option(SmithyCli.DISCOVER, "-d", "Enables model discovery, merging in models found inside of jars")
-                .parameter(SmithyCli.DISCOVER_CLASSPATH, "Enables model discovery using a custom classpath for models")
-                .parameter(SmithyCli.SEVERITY, "Sets a minimum validation event severity to display. "
-                                               + "Defaults to NOTE. Can be set to SUPPRESSED, NOTE, WARNING, "
-                                               + "DANGER, ERROR.")
-                .positional("<MODELS>", "Path to Smithy models or directories")
+    public int execute(Arguments arguments, Env env) {
+        arguments.addReceiver(new ConfigOptions());
+        arguments.addReceiver(new DiscoveryOptions());
+        arguments.addReceiver(new ValidatorOptions());
+        arguments.addReceiver(new BuildOptions());
+        arguments.addReceiver(new ValidationEventFormatOptions());
+
+        CommandAction action = HelpActionWrapper.fromCommand(
+                this,
+                parentCommandName,
+                new ClasspathAction(dependencyResolverFactory, this::runWithClassLoader));
+
+        return action.apply(arguments, env);
+    }
+
+    private int runWithClassLoader(SmithyBuildConfig config, Arguments arguments, Env env) {
+        new ModelBuilder()
+                .config(config)
+                .arguments(arguments)
+                .env(env)
+                .models(arguments.getPositional())
+                .validationPrinter(env.stdout())
                 .build();
-    }
-
-    @Override
-    public void execute(Arguments arguments, ClassLoader classLoader) {
-        List<String> models = arguments.positionalArguments();
-        Colors.BRIGHT_WHITE.out(String.format("Validating Smithy model sources: %s", models));
-        CommandUtils.buildModel(arguments, classLoader, SetUtils.of());
-        Colors.BRIGHT_BOLD_GREEN.out("Smithy validation complete");
+        LOGGER.info("Smithy validation complete");
+        return 0;
     }
 }

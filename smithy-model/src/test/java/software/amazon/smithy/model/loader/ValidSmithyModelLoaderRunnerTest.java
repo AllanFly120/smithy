@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.loader;
 
 import java.io.IOException;
@@ -23,6 +12,7 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import software.amazon.smithy.model.Model;
@@ -74,12 +64,18 @@ public class ValidSmithyModelLoaderRunnerTest {
                     e);
         }
 
+        validateMatch(result, expected, file);
+    }
+
+    private void validateMatch(Model result, Model expected, String file) {
         if (!result.equals(expected)) {
+            ModelSerializer serializer = ModelSerializer.builder().build();
             throw new IllegalStateException(String.format(
-                    "Result did not match the expected model for %s.\nResult:\n\n%s\n\nExpected:\n\n%s",
+                    "Result did not match the expected model for %s.\nResult:\n\n%s\n\nExpected:\n\n%s\r\nDiff: %s",
                     file,
                     formatModel(result),
-                    formatModel(expected)));
+                    formatModel(expected),
+                    Node.diff(serializer.serialize(result), serializer.serialize(expected))));
         }
     }
 
@@ -103,5 +99,60 @@ public class ValidSmithyModelLoaderRunnerTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    public void canAddTraitsToForwardReferenceMembersWithUseStatements() {
+        Model result = Model.assembler()
+                .addImport(ValidSmithyModelLoaderRunnerTest.class.getResource("forwardrefs/use/use.smithy"))
+                .addModel(shared)
+                .assemble()
+                .unwrap();
+        Model expected = Model.assembler()
+                .addImport(ValidSmithyModelLoaderRunnerTest.class.getResource("forwardrefs/use/result.json"))
+                .addModel(shared)
+                .assemble()
+                .unwrap();
+
+        validateMatch(result, expected, "forwardrefs/use-shapes.smithy");
+    }
+
+    @Test
+    public void canAddTraitsToForwardReferenceMembersWithNoUseStatements() {
+        Model result = Model.assembler()
+                .addImport(ValidSmithyModelLoaderRunnerTest.class.getResource("forwardrefs/use/no-use.smithy"))
+                .addModel(shared)
+                .assemble()
+                .unwrap();
+        Model expected = Model.assembler()
+                .addImport(ValidSmithyModelLoaderRunnerTest.class
+                        .getResource("forwardrefs/use/result.json"))
+                .addModel(shared)
+                .assemble()
+                .unwrap();
+
+        validateMatch(result, expected, "forwardrefs/user/no-use.smithy");
+    }
+
+    @Test
+    public void canHandleForwardRefsInResourceProperties() {
+        Model modelA = Model.assembler()
+                .addImport(ValidSmithyModelLoaderRunnerTest.class
+                        .getResource("forwardrefs/resource/operation.smithy"))
+                .assemble()
+                .unwrap();
+        Model result = Model.assembler()
+                .addModel(modelA)
+                .addImport(ValidSmithyModelLoaderRunnerTest.class
+                        .getResource("forwardrefs/resource/resource.smithy"))
+                .assemble()
+                .unwrap();
+        Model expected = Model.assembler()
+                .addImport(ValidSmithyModelLoaderRunnerTest.class
+                        .getResource("forwardrefs/resource/result.json"))
+                .assemble()
+                .unwrap();
+
+        validateMatch(result, expected, "forwardrefs/resource/operation.smithy");
     }
 }

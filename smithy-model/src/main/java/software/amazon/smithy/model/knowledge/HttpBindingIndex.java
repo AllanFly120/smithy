@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.knowledge;
 
 import java.lang.ref.WeakReference;
@@ -369,7 +358,10 @@ public final class HttpBindingIndex implements KnowledgeIndex {
                     break;
                 } else if (StreamingTrait.isEventStream(target)) {
                     return eventStreamContentType;
-                } else if (target.isDocumentShape() || target.isStructureShape() || target.isUnionShape()) {
+                } else if (target.isDocumentShape() || target.isStructureShape()
+                        || target.isUnionShape()
+                        || target.isListShape()
+                        || target.isMapShape()) {
                     // Document type and structure targets are always the document content-type.
                     return documentContentType;
                 } else if (target.getTrait(MediaTypeTrait.class).isPresent()) {
@@ -386,16 +378,42 @@ public final class HttpBindingIndex implements KnowledgeIndex {
         return null;
     }
 
+    /**
+     * Returns true if the request has a modeled body.
+     *
+     * @param operation Operation to check.
+     * @return Returns true if the operation has document or payload bindings.
+     */
+    public boolean hasRequestBody(ToShapeId operation) {
+        return hasPayloadBindings(getRequestBindings(operation).values());
+    }
+
+    /**
+     * Returns true if the response has a modeled body.
+     *
+     * @param operation Operation to check.
+     * @return Returns true if the operation has document or payload bindings.
+     */
+    public boolean hasResponseBody(ToShapeId operation) {
+        return hasPayloadBindings(getResponseBindings(operation).values());
+    }
+
+    private boolean hasPayloadBindings(Collection<HttpBinding> bindings) {
+        for (HttpBinding binding : bindings) {
+            if (binding.getLocation() == HttpBinding.Location.DOCUMENT
+                    || binding.getLocation() == HttpBinding.Location.PAYLOAD) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private List<HttpBinding> computeRequestBindings(OperationIndex opIndex, OperationShape shape) {
-        return opIndex.getInput(shape.getId())
-                .map(input -> createStructureBindings(input, true))
-                .orElseGet(Collections::emptyList);
+        return createStructureBindings(opIndex.expectInputShape(shape.getId()), true);
     }
 
     private List<HttpBinding> computeResponseBindings(OperationIndex opIndex, OperationShape shape) {
-        return opIndex.getOutput(shape.getId())
-                .map(output -> createStructureBindings(output, false))
-                .orElseGet(Collections::emptyList);
+        return createStructureBindings(opIndex.expectOutputShape(shape.getId()), false);
     }
 
     private List<HttpBinding> createStructureBindings(StructureShape struct, boolean isRequest) {
@@ -426,7 +444,10 @@ public final class HttpBindingIndex implements KnowledgeIndex {
             } else if (!isRequest && member.getTrait(HttpResponseCodeTrait.class).isPresent()) {
                 HttpResponseCodeTrait trait = member.getTrait(HttpResponseCodeTrait.class).get();
                 bindings.add(new HttpBinding(
-                        member, HttpBinding.Location.RESPONSE_CODE, member.getMemberName(), trait));
+                        member,
+                        HttpBinding.Location.RESPONSE_CODE,
+                        member.getMemberName(),
+                        trait));
             } else {
                 unbound.add(member);
             }

@@ -1,18 +1,7 @@
 /*
- * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.protocoltests.traits;
 
 import java.util.ArrayList;
@@ -28,9 +17,9 @@ import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.node.ToNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.ToShapeId;
-import software.amazon.smithy.utils.CodeWriter;
 import software.amazon.smithy.utils.ListUtils;
 import software.amazon.smithy.utils.MapUtils;
+import software.amazon.smithy.utils.SimpleCodeWriter;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.SmithyUnstableApi;
 import software.amazon.smithy.utils.Tagged;
@@ -113,11 +102,14 @@ final class ParameterizedHttpMalformedRequestTestCase
             return ListUtils.of(builder.build());
         }
 
-        int paramLength = testParameters.values().stream().findFirst().map(List::size)
+        int paramLength = testParameters.values()
+                .stream()
+                .findFirst()
+                .map(List::size)
                 .orElseThrow(IllegalStateException::new);
         final List<HttpMalformedRequestTestCase> testCases = new ArrayList<>(paramLength);
         for (int i = 0; i < paramLength; i++) {
-            final CodeWriter writer = new CodeWriter();
+            final SimpleCodeWriter writer = new SimpleCodeWriter();
             for (Map.Entry<String, List<String>> e : testParameters.entrySet()) {
                 writer.putContext(e.getKey(), e.getValue().get(i));
             }
@@ -129,14 +121,16 @@ final class ParameterizedHttpMalformedRequestTestCase
             getDocumentation().map(writer::format).ifPresent(builder::documentation);
 
             testCases.add(builder.request(interpolateRequest(request, writer))
-                                 .response(interpolateResponse(response, writer))
-                                 .build());
+                    .response(interpolateResponse(response, writer))
+                    .build());
         }
         return testCases;
     }
 
-    private static HttpMalformedResponseDefinition interpolateResponse(HttpMalformedResponseDefinition response,
-                                                                       CodeWriter writer) {
+    private static HttpMalformedResponseDefinition interpolateResponse(
+            HttpMalformedResponseDefinition response,
+            SimpleCodeWriter writer
+    ) {
         HttpMalformedResponseDefinition.Builder responseBuilder =
                 response.toBuilder().headers(formatHeaders(writer, response.getHeaders()));
         response.getBody()
@@ -151,8 +145,10 @@ final class ParameterizedHttpMalformedRequestTestCase
         return responseBuilder.build();
     }
 
-    private static HttpMalformedRequestDefinition interpolateRequest(HttpMalformedRequestDefinition request,
-                                                                     CodeWriter writer) {
+    private static HttpMalformedRequestDefinition interpolateRequest(
+            HttpMalformedRequestDefinition request,
+            SimpleCodeWriter writer
+    ) {
         HttpMalformedRequestDefinition.Builder requestBuilder = request.toBuilder()
                 .headers(formatHeaders(writer, request.getHeaders()))
                 .queryParams(request.getQueryParams().stream().map(writer::format).collect(Collectors.toList()));
@@ -161,7 +157,7 @@ final class ParameterizedHttpMalformedRequestTestCase
         return requestBuilder.build();
     }
 
-    private static Map<String, String> formatHeaders(CodeWriter writer, Map<String, String> headers) {
+    private static Map<String, String> formatHeaders(SimpleCodeWriter writer, Map<String, String> headers) {
         Map<String, String> newHeaders = new HashMap<>();
         for (Map.Entry<String, String> headerEntry : headers.entrySet()) {
             newHeaders.put(writer.format(headerEntry.getKey()), writer.format(headerEntry.getValue()));
@@ -184,7 +180,7 @@ final class ParameterizedHttpMalformedRequestTestCase
             Map<String, List<String>> paramsMap = new HashMap<>();
             for (Map.Entry<String, Node> e : params.getStringMap().entrySet()) {
                 paramsMap.put(e.getKey(),
-                              e.getValue().expectArrayNode().getElementsAs(n -> n.expectStringNode().getValue()));
+                        e.getValue().expectArrayNode().getElementsAs(n -> n.expectStringNode().getValue()));
             }
             builder.testParameters(paramsMap);
         });

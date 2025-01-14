@@ -1,29 +1,22 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.shapes;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import software.amazon.smithy.model.SourceException;
 import software.amazon.smithy.model.knowledge.OperationIndex;
-import software.amazon.smithy.utils.ListUtils;
+import software.amazon.smithy.model.traits.MixinTrait;
+import software.amazon.smithy.model.traits.UnitTypeTrait;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 /**
@@ -33,12 +26,37 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
     private final ShapeId input;
     private final ShapeId output;
     private final List<ShapeId> errors;
+    private final List<ShapeId> introducedErrors;
 
     private OperationShape(Builder builder) {
         super(builder, false);
-        errors = ListUtils.copyOf(builder.errors);
-        input = builder.input;
-        output = builder.output;
+
+        input = Objects.requireNonNull(builder.input);
+        output = Objects.requireNonNull(builder.output);
+
+        if (getMixins().isEmpty()) {
+            errors = builder.errors.copy();
+            introducedErrors = errors;
+        } else {
+            // Compute mixin properties of the operation. Input / output are
+            // forbidden in operation mixins, so we don't bother with them
+            // here.
+            Set<ShapeId> computedErrors = new LinkedHashSet<>();
+            for (Shape shape : builder.getMixins().values()) {
+                shape.asOperationShape().ifPresent(mixin -> computedErrors.addAll(mixin.getErrors()));
+            }
+            introducedErrors = builder.errors.copy();
+            computedErrors.addAll(introducedErrors);
+            errors = Collections.unmodifiableList(new ArrayList<>(computedErrors));
+        }
+
+        if (hasTrait(MixinTrait.ID) && (!input.equals(UnitTypeTrait.UNIT) || !output.equals(UnitTypeTrait.UNIT))) {
+            throw new SourceException(String.format(
+                    "Operation shapes with the mixin trait MUST target `%s` for their input and output. Operation "
+                            + "mixin shape `%s` defines one or both of these properties.",
+                    UnitTypeTrait.UNIT,
+                    getId()), builder.getSourceLocation());
+        }
     }
 
     public static Builder builder() {
@@ -47,15 +65,15 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
 
     @Override
     public Builder toBuilder() {
-        return builder().from(this)
+        return updateBuilder(builder())
                 .input(input)
                 .output(output)
-                .errors(errors);
+                .errors(getIntroducedErrors());
     }
 
     @Override
-    public <R> R accept(ShapeVisitor<R> cases) {
-        return cases.operationShape(this);
+    public <R> R accept(ShapeVisitor<R> visitor) {
+        return visitor.operationShape(this);
     }
 
     @Override
@@ -63,22 +81,57 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
         return Optional.of(this);
     }
 
+    @Override
+    public ShapeType getType() {
+        return ShapeType.OPERATION;
+    }
+
     /**
      * <p>Gets the optional shape ID of the input of the operation.</p>
+     *
+     * <p>For backward compatibility, if the input targets {@code smithy.api#Unit},
+     * then an empty optional is returned.
      *
      * @return Returns the optional shape ID.
      */
     public Optional<ShapeId> getInput() {
-        return Optional.ofNullable(input);
+        return input.equals(UnitTypeTrait.UNIT) ? Optional.empty() : Optional.of(input);
     }
 
     /**
      * <p>Gets the optional shape ID of the output of the operation.</p>
      *
+     * <p>For backward compatibility, if the output targets {@code smithy.api#Unit},
+     * then an empty optional is returned.
+     *
      * @return Returns the optional shape ID.
      */
     public Optional<ShapeId> getOutput() {
-        return Optional.ofNullable(output);
+        return output.equals(UnitTypeTrait.UNIT) ? Optional.empty() : Optional.of(output);
+    }
+
+    /**
+     * Gets the input of the operation.
+     *
+     * <p>All operations have input, and they default to target
+     * {@code smithy.api#Unit}.
+     *
+     * @return Returns the non-nullable input.
+     */
+    public ShapeId getInputShape() {
+        return input;
+    }
+
+    /**
+     * Gets the output of the operation.
+     *
+     * <p>All operations have output, and they default to target
+     * {@code smithy.api#Unit}.
+     *
+     * @return Returns the non-nullable output.
+     */
+    public ShapeId getOutputShape() {
+        return output;
     }
 
     /**
@@ -104,6 +157,16 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
     }
 
     /**
+     * Gets the errors introduced by the shape and not inherited
+     * from mixins.
+     *
+     * @return Returns the introduced errors.
+     */
+    public List<ShapeId> getIntroducedErrors() {
+        return introducedErrors;
+    }
+
+    /**
      * <p>Gets a list of the error shape IDs the operation can encounter,
      * including any common errors of a service.
      *
@@ -125,9 +188,9 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
             return false;
         } else {
             OperationShape otherShape = (OperationShape) other;
-            return Objects.equals(input, otherShape.input)
-                   && Objects.equals(output, otherShape.output)
-                   && errors.equals(otherShape.errors);
+            return input.equals(otherShape.input)
+                    && output.equals(otherShape.output)
+                    && errors.equals(otherShape.errors);
         }
     }
 
@@ -135,9 +198,9 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
      * Builder used to create a {@link OperationShape}.
      */
     public static final class Builder extends AbstractShapeBuilder<Builder, OperationShape> {
-        private ShapeId input;
-        private ShapeId output;
-        private final List<ShapeId> errors = new ArrayList<>();
+        private ShapeId input = UnitTypeTrait.UNIT;
+        private ShapeId output = UnitTypeTrait.UNIT;
+        private final BuilderRef<List<ShapeId>> errors = BuilderRef.forList();
 
         @Override
         public ShapeType getShapeType() {
@@ -148,11 +211,10 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
          * Sets the input shape ID of the operation.
          *
          * @param inputShape Shape ID that MUST reference a structure.
-         *  Set to null to clear.
          * @return Returns the builder.
          */
         public Builder input(ToShapeId inputShape) {
-            input = inputShape == null ? null : inputShape.toShapeId();
+            input = inputShape == null ? UnitTypeTrait.UNIT : inputShape.toShapeId();
             return this;
         }
 
@@ -160,11 +222,10 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
          * Sets the output shape ID of the operation.
          *
          * @param outputShape Shape ID that MUST reference a structure.
-         *  Set to null to clear.
          * @return Returns the builder.
          */
         public Builder output(ToShapeId outputShape) {
-            output = outputShape == null ? null : outputShape.toShapeId();
+            output = outputShape == null ? UnitTypeTrait.UNIT : outputShape.toShapeId();
             return this;
         }
 
@@ -187,7 +248,7 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
          * @return Returns the builder.
          */
         public Builder addError(ToShapeId errorShapeId) {
-            errors.add(errorShapeId.toShapeId());
+            errors.get().add(errorShapeId.toShapeId());
             return this;
         }
 
@@ -209,7 +270,7 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
          * @return Returns the builder.
          */
         public Builder addErrors(Collection<ShapeId> errorShapeIds) {
-            errors.addAll(Objects.requireNonNull(errorShapeIds));
+            errors.get().addAll(Objects.requireNonNull(errorShapeIds));
             return this;
         }
 
@@ -220,7 +281,7 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
          * @return Returns the builder.
          */
         public Builder removeError(ToShapeId errorShapeId) {
-            errors.remove(errorShapeId.toShapeId());
+            errors.get().remove(errorShapeId.toShapeId());
             return this;
         }
 
@@ -236,6 +297,22 @@ public final class OperationShape extends Shape implements ToSmithyBuilder<Opera
         @Override
         public OperationShape build() {
             return new OperationShape(this);
+        }
+
+        @Override
+        public Builder flattenMixins() {
+            if (getMixins().isEmpty()) {
+                return this;
+            }
+
+            Set<ShapeId> computedErrors = new LinkedHashSet<>();
+            for (Shape shape : getMixins().values()) {
+                shape.asOperationShape().ifPresent(mixin -> computedErrors.addAll(mixin.getErrors()));
+            }
+
+            computedErrors.addAll(errors.peek());
+            errors(computedErrors);
+            return super.flattenMixins();
         }
     }
 }

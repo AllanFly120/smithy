@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson.validation
 
@@ -6,6 +6,7 @@ use aws.protocols#restJson1
 use smithy.test#httpMalformedRequestTests
 use smithy.framework#ValidationException
 
+@suppress(["UnstableTrait"])
 @http(uri: "/SensitiveValidation", method: "POST")
 operation SensitiveValidation {
     input: SensitiveValidationInput,
@@ -46,6 +47,9 @@ apply SensitiveValidation @httpMalformedRequestTests([
 ])
 
 structure SensitiveValidationInput {
-    @sensitive
-    string: PatternString
+    string: SensitivePatternString
 }
+
+@sensitive
+@pattern("^[a-m]+$")
+string SensitivePatternString

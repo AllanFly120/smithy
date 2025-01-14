@@ -1,7 +1,7 @@
 // This file defines test cases that test httpPrefix headers.
-// See: https://awslabs.github.io/smithy/1.0/spec/http.html#httpprefixheaders-trait
+// See: https://smithy.io/2.0/spec/http-bindings.html#httpprefixheaders-trait
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restxml
 
@@ -12,7 +12,7 @@ use smithy.test#httpResponseTests
 /// This examples adds headers to the input of a request and response by prefix.
 @readonly
 @http(uri: "/HttpPrefixHeaders", method: "GET")
-@externalDocumentation("httpPrefixHeaders Trait": "https://awslabs.github.io/smithy/1.0/spec/http.html#httpprefixheaders-trait")
+@externalDocumentation("httpPrefixHeaders Trait": "https://smithy.io/2.0/spec/http-bindings.html#httpprefixheaders-trait")
 operation HttpPrefixHeaders {
     input: HttpPrefixHeadersInputOutput,
     output: HttpPrefixHeadersInputOutput
@@ -27,32 +27,50 @@ apply HttpPrefixHeaders @httpRequestTests([
         uri: "/HttpPrefixHeaders",
         body: "",
         headers: {
-            "X-Foo": "Foo",
-            "X-Foo-Abc": "Abc value",
-            "X-Foo-Def": "Def value",
+            "x-foo": "Foo",
+            "x-foo-abc": "Abc value",
+            "x-foo-def": "Def value",
         },
         params: {
             foo: "Foo",
             fooMap: {
-                Abc: "Abc value",
-                Def: "Def value",
+                abc: "Abc value",
+                def: "Def value",
             }
         }
     },
     {
         id: "HttpPrefixHeadersAreNotPresent",
-        documentation: "No prefix headers are serialized because the value is empty",
+        documentation: "No prefix headers are serialized because the value is not present",
         protocol: restXml,
         method: "GET",
         uri: "/HttpPrefixHeaders",
         body: "",
         headers: {
-            "X-Foo": "Foo"
+            "x-foo": "Foo"
         },
         params: {
             foo: "Foo",
             fooMap: {}
+        },
+        appliesTo: "client"
+    },
+    {
+        id: "HttpPrefixEmptyHeaders",
+        documentation: "Serialize prefix headers were the value is present but empty"
+        protocol: restXml,
+        method: "GET",
+        uri: "/HttpPrefixHeaders",
+        body: "",
+        params: {
+            fooMap: {
+                abc: ""
+            }
+        },
+        headers: {
+            "x-foo-abc": ""
         }
+        appliesTo: "client",
     },
 ])
 
@@ -64,15 +82,15 @@ apply HttpPrefixHeaders @httpResponseTests([
         code: 200,
         body: "",
         headers: {
-            "X-Foo": "Foo",
-            "X-Foo-Abc": "Abc value",
-            "X-Foo-Def": "Def value",
+            "x-foo": "Foo",
+            "x-foo-abc": "Abc value",
+            "x-foo-def": "Def value",
         },
         params: {
             foo: "Foo",
             fooMap: {
-                Abc: "Abc value",
-                Def: "Def value",
+                abc: "Abc value",
+                def: "Def value",
             }
         }
     },
@@ -83,7 +101,7 @@ apply HttpPrefixHeaders @httpResponseTests([
         code: 200,
         body: "",
         headers: {
-            "X-Foo": "Foo"
+            "x-foo": "Foo"
         },
         params: {
             foo: "Foo",
@@ -93,10 +111,10 @@ apply HttpPrefixHeaders @httpResponseTests([
 ])
 
 structure HttpPrefixHeadersInputOutput {
-    @httpHeader("X-Foo")
+    @httpHeader("x-foo")
     foo: String,
 
-    @httpPrefixHeaders("X-Foo-")
+    @httpPrefixHeaders("x-foo-")
     fooMap: FooPrefixHeaders,
 }
 

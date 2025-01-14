@@ -1,5 +1,5 @@
 {
-    "smithy": "1.0",
+    "smithy": "2.0",
     "shapes": {
         "ns.foo#SomeService": {
             "type": "service",
@@ -9,9 +9,6 @@
                     "name": "someservice"
                 },
                 "aws.apigateway#authorizers": {
-                    "invalid": {
-                        "scheme": "ns.foo#invalid"
-                    },
                     "another": {
                         "scheme": "smithy.api#httpBasicAuth",
                         "type": "token",

@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.utils;
 
 /**
@@ -41,7 +30,16 @@ public interface SmithyBuilder<T> {
      */
     static <T> T requiredState(String method, T value) {
         if (value == null) {
-            throw new IllegalStateException(method + " was not set on the builder");
+            StringBuilder message = new StringBuilder(method).append(" was not set on the builder");
+
+            // Include the builder class that could not be built.
+            StackTraceElement[] elements = Thread.currentThread().getStackTrace();
+            if (elements.length >= 2) {
+                String builder = elements[2].getClassName();
+                message.append(" (builder class is probably ").append(builder).append(')');
+            }
+
+            throw new IllegalStateException(message.toString());
         }
         return value;
     }

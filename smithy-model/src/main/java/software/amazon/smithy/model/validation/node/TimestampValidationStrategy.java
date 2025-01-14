@@ -1,22 +1,9 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.validation.node;
 
-import java.util.function.BiConsumer;
-import software.amazon.smithy.model.FromSourceLocation;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.shapes.MemberShape;
@@ -35,7 +22,7 @@ public enum TimestampValidationStrategy implements NodeValidatorPlugin {
      */
     FORMAT {
         @Override
-        public void apply(Shape shape, Node value, Context context, BiConsumer<FromSourceLocation, String> emitter) {
+        public void apply(Shape shape, Node value, Context context, Emitter emitter) {
             new TimestampFormatPlugin().apply(shape, value, context, emitter);
         }
     },
@@ -46,11 +33,12 @@ public enum TimestampValidationStrategy implements NodeValidatorPlugin {
      */
     EPOCH_SECONDS {
         @Override
-        public void apply(Shape shape, Node value, Context context, BiConsumer<FromSourceLocation, String> emitter) {
+        public void apply(Shape shape, Node value, Context context, Emitter emitter) {
             if (isTimestampMember(context.model(), shape) && !value.isNumberNode()) {
-                emitter.accept(shape, "Invalid " + value.getType() + " value provided for timestamp, `"
-                                      + shape.getId() + "`. Expected a number that contains epoch "
-                                      + "seconds with optional millisecond precision");
+                emitter.accept(shape,
+                        "Invalid " + value.getType() + " value provided for timestamp, `"
+                                + shape.getId() + "`. Expected a number that contains epoch "
+                                + "seconds with optional millisecond precision");
             }
         }
     };

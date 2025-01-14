@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.jsonschema;
 
 import java.util.HashSet;
@@ -53,7 +42,7 @@ public class JsonSchemaConfig {
          */
         STRUCTURE("structure");
 
-        private String stringValue;
+        private final String stringValue;
 
         UnionStrategy(String stringValue) {
             this.stringValue = stringValue;
@@ -84,7 +73,7 @@ public class JsonSchemaConfig {
          */
         PATTERN_PROPERTIES("patternProperties");
 
-        private String stringValue;
+        private final String stringValue;
 
         MapStrategy(String stringValue) {
             this.stringValue = stringValue;
@@ -101,17 +90,24 @@ public class JsonSchemaConfig {
     private TimestampFormatTrait.Format defaultTimestampFormat = TimestampFormatTrait.Format.DATE_TIME;
     private UnionStrategy unionStrategy = UnionStrategy.ONE_OF;
     private MapStrategy mapStrategy = MapStrategy.PROPERTY_NAMES;
-    private String definitionPointer = "#/definitions";
+    private String definitionPointer;
     private ObjectNode schemaDocumentExtensions = Node.objectNode();
     private ObjectNode extensions = Node.objectNode();
     private Set<String> disableFeatures = new HashSet<>();
-    private final ConcurrentHashMap<Class, Object> extensionCache = new ConcurrentHashMap<>();
+    private JsonSchemaVersion jsonSchemaVersion = JsonSchemaVersion.DRAFT07;
+    private final ConcurrentHashMap<Class<?>, Object> extensionCache = new ConcurrentHashMap<>();
     private final NodeMapper nodeMapper = new NodeMapper();
     private ShapeId service;
     private boolean supportNonNumericFloats = false;
+    private boolean enableOutOfServiceReferences = false;
+    private boolean useIntegerType;
+    private boolean disableDefaultValues = false;
+    private boolean disableIntEnums = false;
+    private boolean addReferenceDescriptions = false;
+    private boolean useInlineMaps = false;
 
     public JsonSchemaConfig() {
-        nodeMapper.setWhenMissingSetter(NodeMapper.WhenMissing.INGORE);
+        nodeMapper.setWhenMissingSetter(NodeMapper.WhenMissing.IGNORE);
     }
 
     public boolean getAlphanumericOnlyRefs() {
@@ -191,7 +187,7 @@ public class JsonSchemaConfig {
     }
 
     public String getDefinitionPointer() {
-        return definitionPointer;
+        return definitionPointer != null ? definitionPointer : jsonSchemaVersion.getDefaultDefinitionPointer();
     }
 
     /**
@@ -201,8 +197,8 @@ public class JsonSchemaConfig {
      * characters to place schemas in nested object properties. The provided
      * JSON Pointer does not support escaping.
      *
-     * <p>Defaults to "#/definitions" if no value is specified. OpenAPI
-     * artifacts will want to use "#/components/schemas".
+     * <p>Defaults to {@code "#/definitions"} for schema versions less than 2019-09 and {@code "#/$defs"} for schema
+     * versions 2019-09 and greater. OpenAPI artifacts will want to use "#/components/schemas".
      *
      * @param definitionPointer The root definition pointer to use.
      */
@@ -229,7 +225,7 @@ public class JsonSchemaConfig {
     }
 
     /**
-     * Disables OpenAPI features by their property name name (e.g., "allOf").
+     * Disables OpenAPI features by their property name (e.g., "allOf").
      *
      * @param disableFeatures Feature names to disable.
      */
@@ -365,5 +361,130 @@ public class JsonSchemaConfig {
      */
     public void setSupportNonNumericFloats(boolean supportNonNumericFloats) {
         this.supportNonNumericFloats = supportNonNumericFloats;
+    }
+
+    public boolean isEnableOutOfServiceReferences() {
+        return enableOutOfServiceReferences;
+    }
+
+    /**
+     * Set to true to enable references to shapes outside the service closure.
+     *
+     * Setting this to true means that all the shapes in the model must not conflict, whereas
+     * leaving it at the default, false, means that only the shapes connected to the configured
+     * service via {@link #setService(ShapeId)} must not conflict.
+     *
+     * @param enableOutOfServiceReferences true if out-of-service references should be allowed. default: false
+     */
+    public void setEnableOutOfServiceReferences(boolean enableOutOfServiceReferences) {
+        this.enableOutOfServiceReferences = enableOutOfServiceReferences;
+    }
+
+    public boolean getUseIntegerType() {
+        return useIntegerType;
+    }
+
+    /**
+     * Set to true to use the "integer" type when converting {@code byte},
+     * {@code short}, {@code integer}, and {@code long} shapes to Json Schema.
+     *
+     * <p>By default, these shape types are converted to Json Schema with a type
+     * of "number".
+     *
+     * @param useIntegerType True to use "integer".
+     */
+    public void setUseIntegerType(boolean useIntegerType) {
+        this.useIntegerType = useIntegerType;
+    }
+
+    public boolean getDisableDefaultValues() {
+        return disableDefaultValues;
+    }
+
+    /**
+     * Set to true to disable default values on schemas, including wrapping $ref pointers in an `allOf`.
+     *
+     * @param disableDefaultValues True to disable setting default values.
+     */
+    public void setDisableDefaultValues(boolean disableDefaultValues) {
+        this.disableDefaultValues = disableDefaultValues;
+    }
+
+    public boolean getDisableIntEnums() {
+        return disableIntEnums;
+    }
+
+    /**
+     * Set to true to disable setting an `enum` property for intEnums. When disabled,
+     * intEnums are inlined instead of using a $ref.
+     *
+     * @param disableIntEnums True to disable setting `enum` property for intEnums.
+     */
+    public void setDisableIntEnums(boolean disableIntEnums) {
+        this.disableIntEnums = disableIntEnums;
+    }
+
+    /**
+     * JSON schema version to use when converting Smithy shapes into Json Schema.
+     *
+     * <p> Defaults to JSON Schema version {@code draft07} if no schema version is specified
+     *
+     * @return JSON Schema version that will be used for generated JSON schema
+     */
+    public JsonSchemaVersion getJsonSchemaVersion() {
+        return jsonSchemaVersion;
+    }
+
+    /**
+     * Set the JSON schema version to use when converting Smithy shapes into Json Schema.
+     *
+     * @param schemaVersion JSON Schema version to use for generated schema
+     */
+    public void setJsonSchemaVersion(JsonSchemaVersion schemaVersion) {
+        this.jsonSchemaVersion = Objects.requireNonNull(schemaVersion);
+    }
+
+    /**
+     * Whether to add the {@code description} property to Schema References
+     * when converting Smithy member shapes into JSON Schema with the value
+     * of the member's documentation.
+     *
+     * <p>Defaults to {@code false}.</p>
+     *
+     * @return Whether to add descriptions to Schema References.
+     */
+    public boolean getAddReferenceDescriptions() {
+        return addReferenceDescriptions;
+    }
+
+    /**
+     * Sets whether the {@code description} property should be added to Schema References.
+     *
+     * @param addReferenceDescriptions Whether to add descriptions to Schema References
+     */
+    public void setAddReferenceDescriptions(boolean addReferenceDescriptions) {
+        this.addReferenceDescriptions = addReferenceDescriptions;
+    }
+
+    /**
+     * Whether to inline map shapes when creating JSON Schema object types
+     * from them.
+     *
+     * <p>Defaults to {@code false}.</p>
+     *
+     * @return Whether to inline map shapes in the resulting schema
+     */
+    public boolean getUseInlineMaps() {
+        return useInlineMaps;
+    }
+
+    /**
+     * Sets whether to inline map shapes when creating JSON schema object types
+     * from them.
+     *
+     * @param useInlineMaps Whether to inline map shapes in the resulting schema.
+     */
+    public void setUseInlineMaps(boolean useInlineMaps) {
+        this.useInlineMaps = useInlineMaps;
     }
 }

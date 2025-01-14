@@ -1,26 +1,17 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.build;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.function.Function;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.utils.ListUtils;
 
 /**
  * Creates a model transformer by name.
@@ -41,6 +32,18 @@ public interface ProjectionTransformer {
      * @throws IllegalArgumentException if the arguments are invalid.
      */
     Model transform(TransformContext context);
+
+    /**
+     * Allows the composition of projections by returning additional
+     * projections to run after the current one.
+     *
+     * @param context Transformation context.
+     * @return a collection of named projections to run.
+     * @throws IllegalArgumentException if the arguments are invalid.
+     */
+    default List<String> getAdditionalProjections(TransformContext context) {
+        return ListUtils.of();
+    }
 
     /**
      * Creates a {@code ProjectionTransformer} factory function using SPI

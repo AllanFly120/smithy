@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.json
 
@@ -16,7 +16,10 @@ use smithy.test#httpResponseTests
         protocol: awsJson1_1,
         body: "{}",
         bodyMediaType: "application/json",
-        headers: {"Content-Type": "application/x-amz-json-1.1"},
+        headers: {
+            "Content-Type": "application/x-amz-json-1.1",
+            "X-Amz-Target": "JsonProtocol.NullOperation",
+        },
         params: {
             string: null
         },
@@ -33,51 +36,14 @@ use smithy.test#httpResponseTests
                 "string": null
             }""",
         bodyMediaType: "application/json",
-        headers: {"Content-Type": "application/x-amz-json-1.1"},
+        headers: {
+            "Content-Type": "application/x-amz-json-1.1",
+            "X-Amz-Target": "JsonProtocol.NullOperation",
+        },
         params: {},
         method: "POST",
         uri: "/",
         appliesTo: "server",
-    },
-    {
-        id: "AwsJson11MapsSerializeNullValues",
-        documentation: "Serializes null values in maps",
-        protocol: awsJson1_1,
-        body: """
-            {
-                "sparseStringMap": {
-                    "foo": null
-                }
-            }""",
-        bodyMediaType: "application/json",
-        headers: {"Content-Type": "application/x-amz-json-1.1"},
-        params: {
-            "sparseStringMap": {
-                "foo": null
-            }
-        },
-        method: "POST",
-        uri: "/",
-    },
-    {
-        id: "AwsJson11ListsSerializeNull",
-        documentation: "Serializes null values in lists",
-        protocol: awsJson1_1,
-        body: """
-            {
-                "sparseStringList": [
-                    null
-                ]
-            }""",
-        bodyMediaType: "application/json",
-        headers: {"Content-Type": "application/x-amz-json-1.1"},
-        params: {
-            "sparseStringList": [
-                null
-            ]
-        },
-        method: "POST",
-        uri: "/",
     }
 ])
 @httpResponseTests([
@@ -107,53 +73,111 @@ use smithy.test#httpResponseTests
             string: null
         },
         appliesTo: "server",
-    },
+    }
+])
+operation NullOperation {
+    input: NullOperationInputOutput
+    output: NullOperationInputOutput
+}
+
+structure NullOperationInputOutput {
+    string: String
+}
+
+@httpRequestTests([
     {
-        id: "AwsJson11MapsDeserializeNullValues",
-        documentation: "Deserializes null values in maps",
-        protocol: awsJson1_1,
-        code: 200,
+        id: "AwsJson11SparseMapsSerializeNullValues"
+        documentation: "Serializes null values in maps"
+        protocol: awsJson1_1
         body: """
             {
                 "sparseStringMap": {
                     "foo": null
                 }
-            }""",
-        bodyMediaType: "application/json",
-        headers: {"Content-Type": "application/x-amz-json-1.1"},
+            }"""
+        bodyMediaType: "application/json"
+        headers: {
+            "Content-Type": "application/x-amz-json-1.1"
+            "X-Amz-Target": "JsonProtocol.SparseNullsOperation"
+        }
         params: {
             "sparseStringMap": {
                 "foo": null
             }
-        },
+        }
+        method: "POST"
+        uri: "/"
     },
     {
-        id: "AwsJson11ListsDeserializeNull",
-        documentation: "Deserializes null values in lists",
-        protocol: awsJson1_1,
-        code: 200,
+        id: "AwsJson11SparseListsSerializeNull"
+        documentation: "Serializes null values in lists"
+        protocol: awsJson1_1
         body: """
             {
                 "sparseStringList": [
                     null
                 ]
-            }""",
-        bodyMediaType: "application/json",
-        headers: {"Content-Type": "application/x-amz-json-1.1"},
+            }"""
+        bodyMediaType: "application/json"
+        headers: {
+            "Content-Type": "application/x-amz-json-1.1"
+            "X-Amz-Target": "JsonProtocol.SparseNullsOperation"
+        }
         params: {
             "sparseStringList": [
                 null
             ]
-        },
+        }
+        method: "POST"
+        uri: "/"
     }
 ])
-operation NullOperation {
-    input: NullOperationInputOutput,
-    output: NullOperationInputOutput,
+@httpResponseTests([
+    {
+        id: "AwsJson11SparseMapsDeserializeNullValues"
+        documentation: "Deserializes null values in maps"
+        protocol: awsJson1_1
+        code: 200
+        body: """
+            {
+                "sparseStringMap": {
+                    "foo": null
+                }
+            }"""
+        bodyMediaType: "application/json"
+        headers: {"Content-Type": "application/x-amz-json-1.1"}
+        params: {
+            "sparseStringMap": {
+                "foo": null
+            }
+        }
+    }
+    {
+        id: "AwsJson11SparseListsDeserializeNull"
+        documentation: "Deserializes null values in lists"
+        protocol: awsJson1_1
+        code: 200
+        body: """
+            {
+                "sparseStringList": [
+                    null
+                ]
+            }"""
+        bodyMediaType: "application/json"
+        headers: {"Content-Type": "application/x-amz-json-1.1"}
+        params: {
+            "sparseStringList": [
+                null
+            ]
+        }
+    }
+])
+operation SparseNullsOperation {
+    input: SparseNullsOperationInputOutput
+    output: SparseNullsOperationInputOutput
 }
 
-structure NullOperationInputOutput {
-    string: String,
-    sparseStringList: SparseStringList,
-    sparseStringMap: SparseStringMap,
+structure SparseNullsOperationInputOutput {
+    sparseStringList: SparseStringList
+    sparseStringMap: SparseStringMap
 }

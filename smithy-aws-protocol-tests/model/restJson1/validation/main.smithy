@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson.validation
 
@@ -14,11 +14,13 @@ service RestJsonValidation {
         MalformedEnum,
         MalformedLength,
         MalformedLengthOverride,
+        MalformedLengthQueryString,
         MalformedPattern,
         MalformedPatternOverride,
         MalformedRange,
         MalformedRangeOverride,
         MalformedRequired,
+        MalformedUniqueItems,
         RecursiveStructures,
         SensitiveValidation
     ]

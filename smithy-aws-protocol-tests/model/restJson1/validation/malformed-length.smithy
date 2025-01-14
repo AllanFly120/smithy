@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson.validation
 
@@ -6,15 +6,24 @@ use aws.protocols#restJson1
 use smithy.test#httpMalformedRequestTests
 use smithy.framework#ValidationException
 
+@suppress(["UnstableTrait"])
 @http(uri: "/MalformedLength", method: "POST")
 operation MalformedLength {
     input: MalformedLengthInput,
     errors: [ValidationException]
 }
 
+@suppress(["UnstableTrait"])
 @http(uri: "/MalformedLengthOverride", method: "POST")
 operation MalformedLengthOverride {
     input: MalformedLengthOverrideInput,
+    errors: [ValidationException]
+}
+
+@suppress(["UnstableTrait"])
+@http(uri: "/MalformedLengthQueryString", method: "POST")
+operation MalformedLengthQueryString {
+    input: MalformedLengthQueryStringInput,
     errors: [ValidationException]
 }
 
@@ -83,8 +92,8 @@ apply MalformedLength @httpMalformedRequestTests([
             }
         },
         testParameters: {
-            value: ["a", "abcdefghijklmnopqrstuvwxyz"],
-            inputLength: ["1", "26"]
+            value: ["a", "abcdefghijklmnopqrstuvwxyz", "👍"],
+            inputLength: ["1", "26", "1"]
         }
     },
     {
@@ -366,7 +375,7 @@ apply MalformedLengthOverride @httpMalformedRequestTests([
             }
         },
         testParameters: {
-            value: ["YWJj", "YWJjZGVmZw==="],
+            value: ["YWJj", "YWJjZGVmZw=="],
             inputLength: ["3", "7"]
         }
     },
@@ -400,8 +409,8 @@ apply MalformedLengthOverride @httpMalformedRequestTests([
             }
         },
         testParameters: {
-            value: ["abc", "abcdefg"],
-            inputLength: ["3", "7"]
+            value: ["abc", "abcdefg", "👍👍👍"],
+            inputLength: ["3", "7", "3"]
         }
     },
     {
@@ -542,6 +551,43 @@ apply MalformedLengthOverride @httpMalformedRequestTests([
     }
 ])
 
+// query strings that have unspecified value are treated as being an empty string
+// which means length validation is as important as required validation for ensuring a specified value
+apply MalformedLengthQueryString @httpMalformedRequestTests([
+    {
+        id: "RestJsonMalformedLengthQueryStringNoValue",
+        documentation: """
+        When a required member has no value in the query string,
+        the response should be a 400 ValidationException.""",
+        protocol: restJson1,
+        request: {
+            method: "POST",
+            uri: "/MalformedLengthQueryString",
+            body: "{}",
+            queryParams: [
+                "string"
+            ],
+            headers: {
+                "content-type": "application/json"
+            },
+        },
+        response: {
+            code: 400,
+            headers: {
+                "x-amzn-errortype": "ValidationException"
+            },
+            body: {
+                mediaType: "application/json",
+                assertion: {
+                    contents: """
+                    { "message" : "1 validation error detected. Value with length 0 at '/string' failed to satisfy constraint: Member must have length between 2 and 8, inclusive",
+                      "fieldList" : [{"message": "Value with length 0 at '/string' failed to satisfy constraint: Member must have length between 2 and 8, inclusive", "path": "/string"}]}"""
+                }
+            }
+        }
+    },
+])
+
 structure MalformedLengthInput {
     blob: LengthBlob,
     string: LengthString,
@@ -569,6 +615,11 @@ structure MalformedLengthOverrideInput {
 
     @length(min:4, max:6)
     map: LengthMap
+}
+
+structure MalformedLengthQueryStringInput {
+    @httpQuery("string")
+    string: LengthString
 }
 
 @length(min:2, max:8)
