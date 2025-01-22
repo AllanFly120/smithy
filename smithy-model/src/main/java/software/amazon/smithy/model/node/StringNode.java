@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.node;
 
 import java.util.Arrays;
@@ -32,7 +21,7 @@ import software.amazon.smithy.utils.SmithyInternalApi;
 /**
  * Represents a string node.
  */
-public final class StringNode extends Node {
+public final class StringNode extends Node implements Comparable<StringNode> {
     private String value;
 
     /**
@@ -65,7 +54,9 @@ public final class StringNode extends Node {
      */
     @SmithyInternalApi
     public static Pair<StringNode, Consumer<String>> createLazyString(
-            String placeholder, SourceLocation sourceLocation) {
+            String placeholder,
+            SourceLocation sourceLocation
+    ) {
         StringNode result = new StringNode(placeholder, sourceLocation);
         return Pair.of(result, result::updateValue);
     }
@@ -136,7 +127,9 @@ public final class StringNode extends Node {
     public String expectOneOf(Collection<String> validValues) {
         if (!validValues.contains(value)) {
             throw new ExpectationNotMetException(String.format(
-                    "Expected one of %s; got `%s`.", ValidationUtils.tickedList(validValues), value), this);
+                    "Expected one of %s; got `%s`.",
+                    ValidationUtils.tickedList(validValues),
+                    value), this);
         }
         return value;
     }
@@ -168,6 +161,19 @@ public final class StringNode extends Node {
         }
     }
 
+    /**
+     * Gets the value of the string as a ShapeId if it is a valid Shape ID.
+     *
+     * @return Returns the optional Shape ID.
+     */
+    public Optional<ShapeId> asShapeId() {
+        try {
+            return Optional.of(ShapeId.from(getValue()));
+        } catch (ShapeIdSyntaxException e) {
+            return Optional.empty();
+        }
+    }
+
     @Override
     public boolean equals(Object other) {
         return other instanceof StringNode && value.equals(((StringNode) other).getValue());
@@ -181,5 +187,10 @@ public final class StringNode extends Node {
     @Override
     public String toString() {
         return value;
+    }
+
+    @Override
+    public int compareTo(StringNode o) {
+        return getValue().compareTo(o.getValue());
     }
 }

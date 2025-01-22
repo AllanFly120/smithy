@@ -1,18 +1,7 @@
 /*
- * Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.validation.validators;
 
 import java.util.ArrayList;
@@ -22,10 +11,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.knowledge.NeighborProviderIndex;
 import software.amazon.smithy.model.neighbor.Walker;
@@ -35,7 +24,7 @@ import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.SimpleShape;
-import software.amazon.smithy.model.traits.ErrorTrait;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.validation.AbstractValidator;
 import software.amazon.smithy.model.validation.Severity;
 import software.amazon.smithy.model.validation.ValidationEvent;
@@ -60,12 +49,14 @@ public final class ServiceValidator extends AbstractValidator {
 
     @Override
     public List<ValidationEvent> validate(Model model) {
-        return model.shapes(ServiceShape.class)
-                .flatMap(shape -> validateService(model, shape).stream())
-                .collect(Collectors.toList());
+        List<ValidationEvent> events = new ArrayList<>();
+        for (ServiceShape shape : model.getServiceShapes()) {
+            validateService(model, shape, events);
+        }
+        return events;
     }
 
-    private List<ValidationEvent> validateService(Model model, ServiceShape service) {
+    private void validateService(Model model, ServiceShape service, List<ValidationEvent> events) {
         // Ensure that shapes bound to the service have unique shape names.
         Walker walker = new Walker(NeighborProviderIndex.of(model).getProvider());
         Map<ShapeId, Shape> serviceClosure = new HashMap<>();
@@ -74,7 +65,7 @@ public final class ServiceValidator extends AbstractValidator {
         // Create a mapping of lowercase contextual shape names to shape IDs.
         Map<String, Set<ShapeId>> normalizedNamesToIds = new HashMap<>();
         for (ShapeId id : serviceClosure.keySet()) {
-            if (!id.getMember().isPresent()) {
+            if (!id.hasMember()) {
                 String possiblyRename = service.getContextualName(id);
                 normalizedNamesToIds
                         .computeIfAbsent(possiblyRename.toLowerCase(Locale.ENGLISH), name -> new TreeSet<>())
@@ -84,7 +75,6 @@ public final class ServiceValidator extends AbstractValidator {
 
         // Determine the severity of each conflict.
         ConflictDetector detector = new ConflictDetector(model);
-        List<ValidationEvent> events = new ArrayList<>();
 
         // Figure out if each conflict can be ignored, and then emit events for
         // both sides of the conflict using the appropriate severity.
@@ -102,7 +92,6 @@ public final class ServiceValidator extends AbstractValidator {
                                 Severity severity = detector.detect(subject, other);
                                 if (severity != null) {
                                     events.add(conflictingNames(severity, service, subject, other));
-                                    events.add(conflictingNames(severity, service, other, subject));
                                 }
                             });
                         }
@@ -112,8 +101,6 @@ public final class ServiceValidator extends AbstractValidator {
         }
 
         events.addAll(validateRenames(service, serviceClosure));
-
-        return events;
     }
 
     private List<ValidationEvent> validateRenames(ServiceShape service, Map<ShapeId, Shape> closure) {
@@ -130,13 +117,17 @@ public final class ServiceValidator extends AbstractValidator {
             renameMappings.computeIfAbsent(to.toLowerCase(Locale.ENGLISH), t -> new HashSet<>()).add(from);
 
             if (!ShapeId.isValidIdentifier(to)) {
-                events.add(error(service, String.format(
-                        "Service attempts to rename `%s` to an invalid identifier, \"%s\"",
-                        from, to)));
+                events.add(error(service,
+                        String.format(
+                                "Service attempts to rename `%s` to an invalid identifier, \"%s\"",
+                                from,
+                                to)));
             } else if (to.equals(from.getName())) {
-                events.add(error(service, String.format(
-                        "Service rename for `%s` does not actually change the name from `%s`",
-                        from, to)));
+                events.add(error(service,
+                        String.format(
+                                "Service rename for `%s` does not actually change the name from `%s`",
+                                from,
+                                to)));
             }
 
             // Each renamed shape ID must actually exist in the closure.
@@ -144,9 +135,13 @@ public final class ServiceValidator extends AbstractValidator {
                 events.add(error(service, "Service attempts to rename a shape not in the service: " + from));
             } else {
                 getInvalidRenameReason(closure.get(from)).ifPresent(reason -> {
-                    events.add(error(service, String.format(
-                            "Service attempts to rename a %s shape from `%s` to \"%s\"; %s",
-                            closure.get(from).getType(), from, to, reason)));
+                    events.add(error(service,
+                            String.format(
+                                    "Service attempts to rename a %s shape from `%s` to \"%s\"; %s",
+                                    closure.get(from).getType(),
+                                    from,
+                                    to,
+                                    reason)));
                 });
             }
         }
@@ -157,8 +152,6 @@ public final class ServiceValidator extends AbstractValidator {
     private Optional<String> getInvalidRenameReason(Shape shape) {
         if (shape.isMemberShape() || shape.isResourceShape() || shape.isOperationShape()) {
             return Optional.of(shape.getType() + "s cannot be renamed");
-        } else if (shape.hasTrait(ErrorTrait.class)) {
-            return Optional.of("errors cannot be renamed");
         } else {
             return Optional.empty();
         }
@@ -183,7 +176,9 @@ public final class ServiceValidator extends AbstractValidator {
                     .append("\") ");
         }
 
-        message.append("in the `").append(service.getId()).append("` service closure. ")
+        message.append("in the `")
+                .append(service.getId())
+                .append("` service closure. ")
                 .append("Shapes in the closure of a service ")
                 .append(severity.ordinal() >= Severity.DANGER.ordinal() ? "must " : "should ")
                 .append("have case-insensitively unique names regardless of their namespaces. ")
@@ -238,7 +233,7 @@ public final class ServiceValidator extends AbstractValidator {
             if (isShapeTypeConflictForbidden(a)
                     || isShapeTypeConflictForbidden(b)
                     || a.getType() != b.getType()
-                    || !a.getAllTraits().equals(b.getAllTraits())) {
+                    || !equivalentTraits(a.getAllTraits(), b.getAllTraits())) {
                 return Severity.ERROR;
             }
 
@@ -256,6 +251,24 @@ public final class ServiceValidator extends AbstractValidator {
 
             // The conflict occurred on a list or set.
             return Severity.WARNING;
+        }
+
+        // Check if the traits are equal, disregarding synthetic traits.
+        private boolean equivalentTraits(Map<ShapeId, Trait> left, Map<ShapeId, Trait> right) {
+            for (Map.Entry<ShapeId, Trait> entry : left.entrySet()) {
+                if (!entry.getValue().isSynthetic()) {
+                    if (!Objects.equals(entry.getValue(), right.get(entry.getKey()))) {
+                        return false;
+                    }
+                }
+            }
+            // Only thing to check here is if the right map has traits the left map doesn't.
+            for (Map.Entry<ShapeId, Trait> entry : right.entrySet()) {
+                if (!entry.getValue().isSynthetic() && !left.containsKey(entry.getKey())) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private boolean isShapeTypeConflictForbidden(Shape shape) {

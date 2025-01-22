@@ -1,177 +1,69 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.cli;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import software.amazon.smithy.cli.commands.BuildCommand;
-import software.amazon.smithy.cli.commands.ValidateCommand;
 
 public class CliTest {
-    @Test
-    public void noArgsPrintsMainHelp() throws Exception {
-        Cli cli = new Cli("mytest");
-        PrintStream out = System.out;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
-        System.setOut(printStream);
-        cli.run(new String[]{});
-        System.setOut(out);
-        String help = outputStream.toString("UTF-8");
 
-        assertThat(help, containsString("mytest"));
+    @Test
+    public void detectsInvalidArguments() {
+        CliUtils.Result result = CliUtils.runSmithy("--foo");
+
+        assertThat(result.code(), not(0));
+        assertThat(result.stderr(), containsString("Unknown argument"));
     }
 
     @Test
-    public void printsMainHelp() throws Exception {
-        Cli cli = new Cli("mytest");
-        cli.addCommand(new BuildCommand());
-        cli.addCommand(new ValidateCommand());
-        PrintStream out = System.out;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
-        System.setOut(printStream);
-        cli.run(new String[]{"--help"});
-        System.setOut(out);
-        String help = outputStream.toString("UTF-8");
+    public void showsStacktrace() {
+        CliUtils.Result result = CliUtils.runSmithy("--stacktrace", "--foo");
 
-        assertThat(help, containsString("build"));
-        assertThat(help, containsString("validate"));
-        assertThat(help, containsString("mytest"));
+        assertThat(result.code(), not(0));
+        assertThat(result.stderr(), containsString("software.amazon.smithy.cli.CliError"));
     }
 
     @Test
-    public void printsSubcommandHelp() throws Exception {
-        Cli cli = new Cli("mytest");
-        cli.addCommand(new BuildCommand());
-        cli.addCommand(new ValidateCommand());
-        PrintStream out = System.out;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
-        System.setOut(printStream);
-        cli.run(new String[]{"validate", "--help"});
-        System.setOut(out);
-        String help = outputStream.toString("UTF-8");
+    public void canDisableLogging() {
+        CliUtils.Result result = CliUtils.runSmithy("validate", "--logging", "OFF");
 
-        assertThat(help, containsString("validate"));
-        assertThat(help, containsString("--help"));
-        assertThat(help, containsString("--debug"));
-        assertThat(help, containsString("--no-color"));
+        assertThat(result.code(), equalTo(0));
+        assertThat(result.stderr(), not(containsString("Invoking Command")));
     }
 
     @Test
-    public void showsStacktrace() throws Exception {
-        Cli cli = new Cli("mytest");
-        PrintStream out = System.out;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
-        System.setOut(printStream);
+    public void canEnableLoggingViaLogLevel() {
+        CliUtils.Result result = CliUtils.runSmithy("validate", "--logging", "FINE");
 
-        try {
-            cli.run(new String[]{"invalid", "--stacktrace"});
-            Assertions.fail("Expected to throw");
-        } catch (RuntimeException e) {
-        }
-
-        System.setOut(out);
-        String help = outputStream.toString("UTF-8");
-
-        assertThat(help, containsString("Unknown command or argument"));
+        assertThat(result.code(), equalTo(0));
+        assertThat(result.stderr(), containsString("Invoking Command"));
     }
 
     @Test
-    public void canDisableLogging() throws Exception {
-        Cli cli = new Cli("mytest");
-        cli.addCommand(new BuildCommand());
-        PrintStream err = System.err;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
+    public void canEnableDebugLogging() {
+        CliUtils.Result result = CliUtils.runSmithy("validate", "--debug");
 
-        try {
-            System.setErr(printStream);
-            cli.run(new String[]{"build", "--logging", "OFF"});
-            String result = outputStream.toString("UTF-8");
-
-            assertThat(result, not(containsString("INFO -")));
-        } finally {
-            System.setErr(err);
-        }
+        assertThat(result.code(), equalTo(0));
+        assertThat(result.stderr(), containsString("Invoking Command"));
     }
 
     @Test
-    public void canEnableLoggingViaLogLevel() throws Exception {
-        Cli cli = new Cli("mytest");
-        cli.addCommand(new BuildCommand());
-        PrintStream err = System.err;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
+    public void canForceColors() {
+        CliUtils.Result result = CliUtils.runSmithyWithAutoColors("--force-color", "--help");
 
-        try {
-            System.setErr(printStream);
-            cli.run(new String[]{"build", "--logging", "INFO"});
-            String result = outputStream.toString("UTF-8");
-
-            assertThat(result, containsString("INFO -"));
-        } finally {
-            System.setErr(err);
-        }
+        assertThat(result.stdout(), containsString("[0m"));
     }
 
     @Test
-    public void canEnableLogging() throws Exception {
-        Cli cli = new Cli("mytest");
-        cli.setConfigureLogging(true);
-        cli.addCommand(new BuildCommand());
-        PrintStream err = System.err;
+    public void canForceDisableColors() {
+        CliUtils.Result result = CliUtils.runSmithyWithAutoColors("--no-color", "--help");
 
-        try {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            PrintStream printStream = new PrintStream(outputStream);
-            System.setErr(printStream);
-            cli.run(new String[]{"build"});
-            String result = outputStream.toString("UTF-8");
-
-            assertThat(result, containsString("INFO -"));
-        } finally {
-            System.setErr(err);
-        }
-    }
-
-    @Test
-    public void canEnableDebugLogging() throws Exception {
-        Cli cli = new Cli("mytest");
-        cli.addCommand(new BuildCommand());
-        PrintStream err = System.err;
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PrintStream printStream = new PrintStream(outputStream);
-
-        try {
-            System.setErr(printStream);
-            cli.run(new String[]{"build", "--debug"});
-            String result = outputStream.toString("UTF-8");
-
-            assertThat(result, containsString("FINE -"));
-        } finally {
-            System.setErr(err);
-        }
+        assertThat(result.stdout(), not(containsString("[0m")));
     }
 }

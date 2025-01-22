@@ -1,27 +1,15 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
-import java.util.ArrayList;
 import java.util.List;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.utils.ListUtils;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 /**
@@ -34,7 +22,7 @@ public final class AuthDefinitionTrait extends AbstractTrait implements ToSmithy
 
     public AuthDefinitionTrait(Builder builder) {
         super(ID, builder.getSourceLocation());
-        traits = ListUtils.copyOf(builder.traits);
+        traits = builder.traits.copy();
     }
 
     /**
@@ -57,9 +45,9 @@ public final class AuthDefinitionTrait extends AbstractTrait implements ToSmithy
         builder.sourceLocation(getSourceLocation());
         if (!traits.isEmpty()) {
             ArrayNode ids = traits.stream()
-                .map(ShapeId::toString)
-                .map(Node::from)
-                .collect(ArrayNode.collect());
+                    .map(ShapeId::toString)
+                    .map(Node::from)
+                    .collect(ArrayNode.collect());
             builder.withMember("traits", ids);
         }
         return builder.build();
@@ -78,18 +66,15 @@ public final class AuthDefinitionTrait extends AbstractTrait implements ToSmithy
         @Override
         public AuthDefinitionTrait createTrait(ShapeId target, Node value) {
             Builder builder = builder().sourceLocation(value);
-            ObjectNode objectNode = value.expectObjectNode();
-            objectNode.getArrayMember("traits").ifPresent(traits -> {
-                for (String string : Node.loadArrayOfString("traits", traits)) {
-                    builder.addTrait(ShapeId.from(string));
-                }
-            });
-            return builder.build();
+            value.expectObjectNode().getArrayMember("traits", ShapeId::fromNode, builder::traits);
+            AuthDefinitionTrait result = builder.build();
+            result.setNodeCache(value);
+            return result;
         }
     }
 
     public static final class Builder extends AbstractTraitBuilder<AuthDefinitionTrait, Builder> {
-        private final List<ShapeId> traits = new ArrayList<>();
+        private final BuilderRef<List<ShapeId>> traits = BuilderRef.forList();
 
         @Override
         public AuthDefinitionTrait build() {
@@ -98,12 +83,12 @@ public final class AuthDefinitionTrait extends AbstractTrait implements ToSmithy
 
         public Builder traits(List<ShapeId> traits) {
             this.traits.clear();
-            this.traits.addAll(traits);
+            this.traits.get().addAll(traits);
             return this;
         }
 
         public Builder addTrait(ShapeId trait) {
-            traits.add(trait);
+            traits.get().add(trait);
             return this;
         }
     }

@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson.validation
 
@@ -6,6 +6,7 @@ use aws.protocols#restJson1
 use smithy.test#httpMalformedRequestTests
 use smithy.framework#ValidationException
 
+@suppress(["UnstableTrait"])
 @http(uri: "/MalformedRequired", method: "POST")
 operation MalformedRequired {
     input: MalformedRequiredInput,
@@ -42,8 +43,8 @@ apply MalformedRequired @httpMalformedRequestTests([
                 mediaType: "application/json",
                 assertion: {
                     contents: """
-                    { "message" : "1 validation error detected. Value null at '/string' failed to satisfy constraint: Member must not be null",
-                      "fieldList" : [{"message": "Value null at '/string' failed to satisfy constraint: Member must not be null", "path": "/string"}]}"""
+                    { "message" : "1 validation error detected. Value at '/string' failed to satisfy constraint: Member must not be null",
+                      "fieldList" : [{"message": "Value at '/string' failed to satisfy constraint: Member must not be null", "path": "/string"}]}"""
                 }
             }
         }
@@ -76,42 +77,8 @@ apply MalformedRequired @httpMalformedRequestTests([
                 mediaType: "application/json",
                 assertion: {
                     contents: """
-                    { "message" : "1 validation error detected. Value null at '/string' failed to satisfy constraint: Member must not be null",
-                      "fieldList" : [{"message": "Value null at '/string' failed to satisfy constraint: Member must not be null", "path": "/string"}]}"""
-                }
-            }
-        }
-    },
-    {
-        id: "RestJsonMalformedRequiredQueryNoValue",
-        documentation: """
-        When a required member has no value in the query string,
-        the response should be a 400 ValidationException.""",
-        protocol: restJson1,
-        request: {
-            method: "POST",
-            uri: "/MalformedRequired",
-            body: """
-            { "string": "abc" }""",
-            queryParams: [
-                "stringInQuery"
-            ],
-            headers: {
-                "content-type": "application/json",
-                "string-in-headers": "abc"
-            },
-        },
-        response: {
-            code: 400,
-            headers: {
-                "x-amzn-errortype": "ValidationException"
-            },
-            body: {
-                mediaType: "application/json",
-                assertion: {
-                    contents: """
-                    { "message" : "1 validation error detected. Value null at '/string' failed to satisfy constraint: Member must not be null",
-                      "fieldList" : [{"message": "Value null at '/string' failed to satisfy constraint: Member must not be null", "path": "/string"}]}"""
+                    { "message" : "1 validation error detected. Value at '/string' failed to satisfy constraint: Member must not be null",
+                      "fieldList" : [{"message": "Value at '/string' failed to satisfy constraint: Member must not be null", "path": "/string"}]}"""
                 }
             }
         }
@@ -143,8 +110,8 @@ apply MalformedRequired @httpMalformedRequestTests([
                 mediaType: "application/json",
                 assertion: {
                     contents: """
-                    { "message" : "1 validation error detected. Value null at '/stringInHeader' failed to satisfy constraint: Member must not be null",
-                      "fieldList" : [{"message": "Value null at '/stringInHeader' failed to satisfy constraint: Member must not be null", "path": "/stringInHeader"}]}"""
+                    { "message" : "1 validation error detected. Value at '/stringInHeader' failed to satisfy constraint: Member must not be null",
+                      "fieldList" : [{"message": "Value at '/stringInHeader' failed to satisfy constraint: Member must not be null", "path": "/stringInHeader"}]}"""
                 }
             }
         }

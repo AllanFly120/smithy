@@ -1,3 +1,7 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.jsonschema;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -28,7 +32,7 @@ public class SupportNonNumericFloatsTest {
         assertThat(result.getDefinitions().keySet(), not(empty()));
 
         Node expectedNode = Node.parse(IoUtils.toUtf8String(
-                getClass().getResourceAsStream("non-numeric-floats.jsonschema.json")));
+                getClass().getResourceAsStream("non-numeric-floats.jsonschema.v07.json")));
         Node.assertEquals(result, expectedNode);
     }
 }

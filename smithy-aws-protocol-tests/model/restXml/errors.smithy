@@ -1,6 +1,6 @@
 // This file defines test cases that test error serialization.
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restxml
 
@@ -103,7 +103,7 @@ apply ComplexError @httpResponseTests([
                 Foo: "bar"
             }
         },
-        code: 400,
+        code: 403,
         headers: {
             "Content-Type": "application/xml",
             "X-Header": "Header",

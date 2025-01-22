@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.transform.plugins;
 
 import java.util.ArrayList;
@@ -50,17 +39,21 @@ public final class CleanOperationStructures implements ModelTransformerPlugin {
     }
 
     private OperationShape transformInput(Collection<Shape> removed, OperationShape operation) {
-        return operation.getInput()
-                .filter(id -> removed.stream().anyMatch(s -> s.getId().equals(id)))
-                .map(shape -> operation.toBuilder().input(null).build())
-                .orElse(operation);
+        for (Shape remove : removed) {
+            if (remove.getId().equals(operation.getInputShape())) {
+                return operation.toBuilder().input(null).build();
+            }
+        }
+        return operation;
     }
 
     private OperationShape transformOutput(Collection<Shape> removed, OperationShape operation) {
-        return operation.getOutput()
-                .filter(id -> removed.stream().anyMatch(s -> s.getId().equals(id)))
-                .map(shape -> operation.toBuilder().output(null).build())
-                .orElse(operation);
+        for (Shape remove : removed) {
+            if (remove.getId().equals(operation.getOutputShape())) {
+                return operation.toBuilder().output(null).build();
+            }
+        }
+        return operation;
     }
 
     private OperationShape transformErrors(Collection<Shape> removed, OperationShape operation) {

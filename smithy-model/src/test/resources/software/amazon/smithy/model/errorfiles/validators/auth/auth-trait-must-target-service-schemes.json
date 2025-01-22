@@ -1,5 +1,5 @@
 {
-    "smithy": "1.0",
+    "smithy": "2.0",
     "shapes": {
         "ns.foo#Service": {
             "type": "service",
@@ -10,7 +10,11 @@
             ],
             "traits": {
                 "smithy.api#httpBasicAuth": {},
-                "smithy.api#httpDigestAuth": {}
+                "smithy.api#httpDigestAuth": {},
+                "smithy.api#auth": [
+                    "smithy.api#httpDigestAuth",
+                    "smithy.api#httpBasicAuth"
+                ]
             }
         },
         "ns.foo#ValidOperation": {

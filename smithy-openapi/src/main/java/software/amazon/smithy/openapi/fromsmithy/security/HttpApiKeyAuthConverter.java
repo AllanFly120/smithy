@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.openapi.fromsmithy.security;
 
 import java.util.Set;
@@ -40,13 +29,24 @@ public final class HttpApiKeyAuthConverter implements SecuritySchemeConverter<Ht
 
     @Override
     public SecurityScheme createSecurityScheme(Context<? extends Trait> context, HttpApiKeyAuthTrait trait) {
+        StringBuilder description = new StringBuilder()
+                .append("API key authentication via the '")
+                .append(trait.getName())
+                .append("' ");
+
+        if (trait.getIn().equals(HttpApiKeyAuthTrait.Location.QUERY)) {
+            description.append(" query string parameter");
+        } else {
+            description.append(trait.getIn());
+        }
+
         if (trait.getScheme().isPresent()) {
             return SecurityScheme.builder()
                     .type("http")
                     .scheme(trait.getScheme().get())
                     .name(trait.getName())
                     .in(trait.getIn().toString())
-                    .description("ApiKey authentication semantics via 'Authorization' header")
+                    .description(description.toString())
                     .build();
         }
 
@@ -54,7 +54,7 @@ public final class HttpApiKeyAuthConverter implements SecuritySchemeConverter<Ht
                 .type("apiKey")
                 .name(trait.getName())
                 .in(trait.getIn().toString())
-                .description("X-Api-Key authentication")
+                .description(description.toString())
                 .build();
     }
 

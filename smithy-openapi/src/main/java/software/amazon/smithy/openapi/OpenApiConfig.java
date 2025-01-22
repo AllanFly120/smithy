@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.openapi;
 
 import java.util.Collections;
@@ -22,6 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Logger;
 import software.amazon.smithy.jsonschema.JsonSchemaConfig;
+import software.amazon.smithy.jsonschema.JsonSchemaVersion;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NodeMapper;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -36,9 +26,6 @@ import software.amazon.smithy.utils.StringUtils;
  */
 public class OpenApiConfig extends JsonSchemaConfig {
 
-    /** The supported version of OpenAPI. */
-    public static final String VERSION = "3.0.2";
-
     /** Specifies what to do when the httpPrefixHeaders trait is found in a model. */
     public enum HttpPrefixHeadersStrategy {
         /** The default setting that causes the build to fail. */
@@ -46,6 +33,23 @@ public class OpenApiConfig extends JsonSchemaConfig {
 
         /** The header is omitted from the OpenAPI model and a warning is logged. */
         WARN
+    }
+
+    /** Specifies how to resolve multiple error responses with same error codes. */
+    public enum ErrorStatusConflictHandlingStrategy {
+        /** The default setting that uses OpenAPI's oneOf keyword to combine multiple schemas for same media type. */
+        ONE_OF("oneOf");
+
+        private final String stringValue;
+
+        ErrorStatusConflictHandlingStrategy(String stringValue) {
+            this.stringValue = stringValue;
+        }
+
+        @Override
+        public String toString() {
+            return stringValue;
+        }
     }
 
     /** The JSON pointer to where OpenAPI schema components should be written. */
@@ -68,7 +72,7 @@ public class OpenApiConfig extends JsonSchemaConfig {
         DEPRECATED_PROPERTY_RENAMES.put("openapi.substitutions", "substitutions");
         // Cheating a little here, but oh well.
         DEPRECATED_PROPERTY_RENAMES.put("apigateway.disableCloudFormationSubstitution",
-                                        "disableCloudFormationSubstitution");
+                "disableCloudFormationSubstitution");
     }
 
     private ShapeId protocol;
@@ -84,12 +88,21 @@ public class OpenApiConfig extends JsonSchemaConfig {
     private Map<String, Node> substitutions = Collections.emptyMap();
     private Map<String, Node> jsonAdd = Collections.emptyMap();
     private List<String> externalDocs = ListUtils.of(
-            "Homepage", "API Reference", "User Guide", "Developer Guide", "Reference", "Guide");
-    private boolean useIntegerType;
+            "Homepage",
+            "API Reference",
+            "User Guide",
+            "Developer Guide",
+            "Reference",
+            "Guide");
+    private boolean disableIntegerFormat = false;
+    private boolean syncCorsPreflightIntegration = false;
+    private ErrorStatusConflictHandlingStrategy onErrorStatusConflict;
+    private OpenApiVersion version = OpenApiVersion.VERSION_3_0_2;
 
     public OpenApiConfig() {
         super();
         setDefinitionPointer(SCHEMA_COMPONENTS_POINTER);
+        super.setJsonSchemaVersion(version.getJsonSchemaVersion());
     }
 
     public ShapeId getProtocol() {
@@ -313,21 +326,53 @@ public class OpenApiConfig extends JsonSchemaConfig {
         this.externalDocs = Objects.requireNonNull(externalDocs);
     }
 
-    public boolean getUseIntegerType() {
-        return useIntegerType;
+    public OpenApiVersion getVersion() {
+        return this.version;
+    }
+
+    public void setVersion(OpenApiVersion version) {
+        this.version = Objects.requireNonNull(version);
+        super.setJsonSchemaVersion(version.getJsonSchemaVersion());
+    }
+
+    public boolean getDisableIntegerFormat() {
+        return this.disableIntegerFormat;
     }
 
     /**
-     * Set to true to use the "integer" type when converting {@code byte},
-     * {@code short}, {@code integer}, and {@code long} shapes to OpenAPI.
+     * Set to true to disable setting the `format` property on integer types.
      *
-     * <p>By default, these shape types are converted to OpenAPI with a type
-     * of "number".
-     *
-     * @param useIntegerType True to use "integer".
+     * @param disableIntegerFormat True to disable setting format on integer types.
      */
-    public void setUseIntegerType(boolean useIntegerType) {
-        this.useIntegerType = useIntegerType;
+    public void setDisableIntegerFormat(boolean disableIntegerFormat) {
+        this.disableIntegerFormat = disableIntegerFormat;
+    }
+
+    public boolean getSyncCorsPreflightIntegration() {
+        return this.syncCorsPreflightIntegration;
+    }
+
+    /**
+     * Set true to sync CORS preflight integration request templates with the other
+     * methods of the same path resource and set passthroughBehavior to "never".
+     *
+     * @param syncCorsPreflightIntegration True to match CORS preflight integration.
+     */
+    public void setSyncCorsPreflightIntegration(boolean syncCorsPreflightIntegration) {
+        this.syncCorsPreflightIntegration = syncCorsPreflightIntegration;
+    }
+
+    public ErrorStatusConflictHandlingStrategy getOnErrorStatusConflict() {
+        return onErrorStatusConflict;
+    }
+
+    /**
+     * Specifies what to do when multiple error responses share the same HTTP status code.
+     *
+     * @param onErrorStatusConflict Strategy to use for multiple errors with same status code.
+     */
+    public void setOnErrorStatusConflict(ErrorStatusConflictHandlingStrategy onErrorStatusConflict) {
+        this.onErrorStatusConflict = Objects.requireNonNull(onErrorStatusConflict);
     }
 
     /**
@@ -351,7 +396,7 @@ public class OpenApiConfig extends JsonSchemaConfig {
         // warning on something intentional is just noise. It sucks
         // that this can't tell us when keys are misspelled, but it
         // does allow for a flat key-space for all extensions.
-        mapper.setWhenMissingSetter(NodeMapper.WhenMissing.INGORE);
+        mapper.setWhenMissingSetter(NodeMapper.WhenMissing.IGNORE);
 
         // Fix and remap deprecated keys to newly supported keys.
         ObjectNode node = fixDeprecatedKeys(input.expectObjectNode());
@@ -378,21 +423,27 @@ public class OpenApiConfig extends JsonSchemaConfig {
                 // Fixes specific renamed keys.
                 String rename = DEPRECATED_PROPERTY_RENAMES.get(entry.getKey());
                 LOGGER.warning("Deprecated `openapi` configuration setting found: " + entry.getKey()
-                               + ". Use " + rename + " instead");
+                        + ". Use " + rename + " instead");
                 mapped = mapped.withMember(rename, entry.getValue());
                 mapped = mapped.withoutMember(entry.getKey());
             } else if (entry.getKey().startsWith("disable.")) {
                 // These are now added into the "disableFeatures" property.
                 String property = StringUtils.uncapitalize(entry.getKey().substring(8));
                 throw new OpenApiException("Unsupported `openapi` configuration setting found: " + entry.getKey()
-                                           + ". Add `" + property + "` to the `disableFeatures` property instead");
+                        + ". Add `" + property + "` to the `disableFeatures` property instead");
             } else if (entry.getKey().startsWith("openapi.use.")) {
                 throw new OpenApiException(String.format(
                         "The `%s` `openapi` plugin property is no longer supported. Use the "
-                        + "`disableFeatures` property instead to disable features.", entry.getKey()));
+                                + "`disableFeatures` property instead to disable features.",
+                        entry.getKey()));
             }
         }
 
         return mapped;
+    }
+
+    @Override
+    public void setJsonSchemaVersion(JsonSchemaVersion schemaVersion) {
+        throw new OpenApiException("`jsonSchemaVersion` configuration parameter is not supported by OpenAPI plugin.");
     }
 }

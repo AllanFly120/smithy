@@ -1,11 +1,9 @@
-$version: "1.0"
-
-metadata shared = true
+$version: "2.0"
 
 namespace ns.primitives
 
 list StringList {
-    member: String,
+    member: String
 }
 
 string String

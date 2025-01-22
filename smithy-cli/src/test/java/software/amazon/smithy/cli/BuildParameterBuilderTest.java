@@ -1,3 +1,7 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.cli;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -57,7 +61,7 @@ public class BuildParameterBuilderTest {
                 .allowUnknownTraits(true)
                 .build();
 
-        assertThat(result.args, hasItem(SmithyCli.ALLOW_UNKNOWN_TRAITS));
+        assertThat(result.args, hasItem("--allow-unknown-traits"));
     }
 
     @Test
@@ -96,8 +100,8 @@ public class BuildParameterBuilderTest {
                 .discover(true)
                 .build();
 
-        assertThat(result.args, hasItem(SmithyCli.DISCOVER));
-        assertThat(result.args, not(hasItem(SmithyCli.DISCOVER_CLASSPATH)));
+        assertThat(result.args, hasItem("--discover"));
+        assertThat(result.args, not(hasItem("--discover-classpath")));
     }
 
     @Test
@@ -153,12 +157,13 @@ public class BuildParameterBuilderTest {
                 .discover(true)
                 .build();
 
-        assertThat(result.args, contains(
-                "build",
-                "--discover-classpath",
-                cp("foo.jar", "baz.jar", "bar.jar"),
-                "foo.smithy",
-                "bar.smithy"));
+        assertThat(result.args,
+                contains(
+                        "build",
+                        "--discover-classpath",
+                        cp("foo.jar", "baz.jar", "bar.jar"),
+                        "foo.smithy",
+                        "bar.smithy"));
         assertThat(result.classpath, equalTo(cp("foo.jar", "baz.jar", "bar.jar", "/abc/123.jar")));
         assertThat(result.discoveryClasspath, equalTo(cp("foo.jar", "baz.jar", "bar.jar")));
         assertThat(result.sources, contains("foo.smithy", "bar.smithy"));
@@ -183,12 +188,13 @@ public class BuildParameterBuilderTest {
                 .discover(true)
                 .build();
 
-        assertThat(result.args, contains(
-                "build",
-                "--discover-classpath",
-                cp("foo.jar", "/abc/123.jar"),
-                "foo.smithy",
-                "bar.smithy"));
+        assertThat(result.args,
+                contains(
+                        "build",
+                        "--discover-classpath",
+                        cp("foo.jar", "/abc/123.jar"),
+                        "foo.smithy",
+                        "bar.smithy"));
         assertThat(result.classpath, equalTo(cp("foo.jar", "/abc/123.jar")));
         assertThat(result.discoveryClasspath, equalTo(cp("foo.jar", "/abc/123.jar")));
         assertThat(result.sources, contains("foo.smithy", "bar.smithy"));

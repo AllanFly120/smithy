@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.aws.cloudformation.schema.model;
 
 import static java.lang.String.format;
@@ -49,6 +38,7 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
     private final String documentationUrl;
     private final Map<String, Schema> definitions = new TreeMap<>();
     private final Map<String, Property> properties = new TreeMap<>();
+    private final Set<String> required = new TreeSet<>();
     private final Set<String> readOnlyProperties = new TreeSet<>();
     private final Set<String> writeOnlyProperties = new TreeSet<>();
     private final Set<String> primaryIdentifier = new TreeSet<>();
@@ -58,6 +48,8 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
     // Use a custom comparator to keep the Handler outputs in CRUDL order.
     private final Map<String, Handler> handlers = new TreeMap<>(Comparator.comparing(Handler::getHandlerNameOrder));
     private final Map<String, Remote> remotes = new TreeMap<>();
+    private final Tagging tagging;
+    private final Schema additionalProperties;
 
     private ResourceSchema(Builder builder) {
         typeName = SmithyBuilder.requiredState("typeName", builder.typeName);
@@ -69,6 +61,7 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
         }
         properties.putAll(builder.properties);
 
+        required.addAll(builder.required);
         sourceUrl = builder.sourceUrl;
         documentationUrl = builder.documentationUrl;
         definitions.putAll(builder.definitions);
@@ -80,6 +73,8 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
         additionalIdentifiers = ListUtils.copyOf(builder.additionalIdentifiers);
         handlers.putAll(builder.handlers);
         remotes.putAll(builder.remotes);
+        tagging = builder.tagging;
+        additionalProperties = builder.additionalProperties;
     }
 
     @Override
@@ -102,6 +97,9 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
 
         builder.withMember("properties", mapper.serialize(properties));
 
+        if (!required.isEmpty()) {
+            builder.withMember("required", mapper.serialize(required));
+        }
         if (!readOnlyProperties.isEmpty()) {
             builder.withMember("readOnlyProperties", mapper.serialize(readOnlyProperties));
         }
@@ -126,6 +124,12 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
         if (!remotes.isEmpty()) {
             builder.withMember("remotes", mapper.serialize(remotes));
         }
+        if (tagging != null) {
+            builder.withMember("tagging", mapper.serialize(tagging));
+        }
+        if (additionalProperties != null) {
+            builder.withMember("additionalProperties", mapper.serialize(additionalProperties));
+        }
 
         return builder.build();
     }
@@ -139,6 +143,7 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
                 .documentationUrl(documentationUrl)
                 .definitions(definitions)
                 .properties(properties)
+                .required(required)
                 .readOnlyProperties(readOnlyProperties)
                 .writeOnlyProperties(writeOnlyProperties)
                 .primaryIdentifier(primaryIdentifier)
@@ -146,7 +151,13 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
                 .deprecatedProperties(deprecatedProperties)
                 .additionalIdentifiers(additionalIdentifiers)
                 .handlers(handlers)
-                .remotes(remotes);
+                .remotes(remotes)
+                .tagging(tagging);
+    }
+
+    public static ResourceSchema fromNode(Node node) {
+        NodeMapper mapper = new NodeMapper();
+        return mapper.deserializeInto(node, ResourceSchema.builder()).build();
     }
 
     public static Builder builder() {
@@ -175,6 +186,10 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
 
     public Map<String, Property> getProperties() {
         return properties;
+    }
+
+    public Set<String> getRequired() {
+        return required;
     }
 
     public Set<String> getReadOnlyProperties() {
@@ -209,6 +224,14 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
         return remotes;
     }
 
+    public Tagging getTagging() {
+        return tagging;
+    }
+
+    public Schema getAdditionalProperties() {
+        return additionalProperties;
+    }
+
     public static final class Builder implements SmithyBuilder<ResourceSchema> {
         private String typeName;
         private String description;
@@ -216,6 +239,7 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
         private String documentationUrl;
         private final Map<String, Schema> definitions = new TreeMap<>();
         private final Map<String, Property> properties = new TreeMap<>();
+        private final Set<String> required = new TreeSet<>();
         private final Set<String> readOnlyProperties = new TreeSet<>();
         private final Set<String> writeOnlyProperties = new TreeSet<>();
         private final Set<String> primaryIdentifier = new TreeSet<>();
@@ -224,6 +248,8 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
         private final List<List<String>> additionalIdentifiers = new ArrayList<>();
         private final Map<String, Handler> handlers = new TreeMap<>();
         private final Map<String, Remote> remotes = new TreeMap<>();
+        private Tagging tagging;
+        private Schema additionalProperties;
 
         private Builder() {}
 
@@ -291,6 +317,27 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
 
         public Builder clearProperties() {
             this.properties.clear();
+            return this;
+        }
+
+        public Builder required(Collection<String> required) {
+            this.required.clear();
+            this.required.addAll(required);
+            return this;
+        }
+
+        public Builder addRequired(String required) {
+            this.required.add(required);
+            return this;
+        }
+
+        public Builder removeRequired(String required) {
+            this.required.remove(required);
+            return this;
+        }
+
+        public Builder clearRequired() {
+            this.required.clear();
             return this;
         }
 
@@ -412,6 +459,11 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
             return this;
         }
 
+        public Builder tagging(Tagging tagging) {
+            this.tagging = tagging;
+            return this;
+        }
+
         public Builder addRemote(String name, Remote remote) {
             this.remotes.put(name, remote);
             return this;
@@ -424,6 +476,11 @@ public final class ResourceSchema implements ToNode, ToSmithyBuilder<ResourceSch
 
         public Builder clearRemotes() {
             this.remotes.clear();
+            return this;
+        }
+
+        public Builder additionalProperties(Schema additionalProperties) {
+            this.additionalProperties = additionalProperties;
             return this;
         }
     }

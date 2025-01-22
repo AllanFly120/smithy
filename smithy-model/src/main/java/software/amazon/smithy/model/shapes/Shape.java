@@ -1,32 +1,29 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.shapes;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import software.amazon.smithy.model.FromSourceLocation;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.SourceException;
 import software.amazon.smithy.model.SourceLocation;
 import software.amazon.smithy.model.node.ExpectationNotMetException;
+import software.amazon.smithy.model.traits.MixinTrait;
 import software.amazon.smithy.model.traits.TagsTrait;
 import software.amazon.smithy.model.traits.Trait;
+import software.amazon.smithy.utils.ListUtils;
+import software.amazon.smithy.utils.MapUtils;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.Tagged;
 
@@ -45,8 +42,11 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
 
     private final ShapeId id;
     private final Map<ShapeId, Trait> traits;
+    private final Map<ShapeId, Trait> introducedTraits;
+    private final Map<ShapeId, Shape> mixins;
     private final transient SourceLocation source;
-    private final transient ShapeType type;
+    private transient List<String> memberNames;
+    private int hash;
 
     /**
      * This class is package-private, which means that all subclasses of this
@@ -56,13 +56,116 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      * @param builder Builder to extract values from.
      * @param expectMemberSegments True/false if the ID must have a member.
      */
-    @SuppressWarnings("unchecked")
-    Shape(AbstractShapeBuilder builder, boolean expectMemberSegments) {
-        type = builder.getShapeType();
+    Shape(AbstractShapeBuilder<?, ?> builder, boolean expectMemberSegments) {
         source = builder.getSourceLocation();
         id = SmithyBuilder.requiredState("id", builder.getId());
-        traits = builder.copyTraits();
         validateShapeId(expectMemberSegments);
+
+        introducedTraits = MapUtils.copyOf(builder.getTraits());
+        mixins = MapUtils.orderedCopyOf(builder.getMixins());
+
+        if (mixins.isEmpty()) {
+            // Simple case when there are no mixins.
+            traits = introducedTraits;
+        } else {
+            validateMixins(mixins, introducedTraits);
+            // Compute mixin traits.
+            Map<ShapeId, Trait> computedTraits = new HashMap<>();
+            for (Shape shape : mixins.values()) {
+                // Mixin traits override other mixin traits, in order.
+                computedTraits.putAll(MixinTrait.getNonLocalTraitsFromMap(shape.getAllTraits()));
+            }
+            // Traits applied to the shape directly override inherited traits.
+            computedTraits.putAll(introducedTraits);
+            traits = Collections.unmodifiableMap(computedTraits);
+        }
+    }
+
+    protected void validateMixins(Map<ShapeId, Shape> mixins, Map<ShapeId, Trait> introducedTraits) {
+        Set<String> invalid = new TreeSet<>();
+        for (Shape mixin : mixins.values()) {
+            if (mixin.getType() != getType()) {
+                invalid.add(mixin.getId().toString());
+            }
+        }
+        if (!invalid.isEmpty()) {
+            String invalidList = String.join("`, `", invalid);
+            throw new SourceException(String.format(
+                    "Mixins may only be mixed into shapes of the same type. The following mixins were applied to the "
+                            + "%s shape `%s` which are not %1$s shapes: [`%s`]",
+                    getType(),
+                    getId(),
+                    invalidList),
+                    source);
+        }
+    }
+
+    protected MemberShape[] getRequiredMembers(AbstractShapeBuilder<?, ?> builder, String... requiredMembersNames) {
+        // Caller knows the order of provided member names, so we don't need a dynamic data structure.
+        MemberShape[] members = new MemberShape[requiredMembersNames.length];
+        int missingMemberCount = 0;
+
+        for (int memberNameIndex = 0; memberNameIndex < requiredMembersNames.length; memberNameIndex++) {
+            String requiredMemberName = requiredMembersNames[memberNameIndex];
+            MemberShape member = getRequiredMixinMember(builder, requiredMemberName);
+            if (member != null) {
+                members[memberNameIndex] = member;
+            } else {
+                missingMemberCount++;
+            }
+        }
+
+        if (missingMemberCount > 0) {
+            List<String> missingMembers = new ArrayList<>();
+            for (int memberIndex = 0; memberIndex < members.length; memberIndex++) {
+                if (members[memberIndex] == null) {
+                    missingMembers.add(requiredMembersNames[memberIndex]);
+                }
+            }
+            throw missingRequiredMembersException(missingMembers);
+        }
+
+        return members;
+    }
+
+    private MemberShape getRequiredMixinMember(AbstractShapeBuilder<?, ?> builder, String requiredMemberName) {
+        Optional<MemberShape> memberOnBuilder = builder.getMember(requiredMemberName);
+        if (memberOnBuilder.isPresent()) {
+            return memberOnBuilder.get();
+        }
+
+        // Get the most recently introduced mixin member with the given name.
+        MemberShape mostRecentMember = null;
+
+        for (Shape shape : builder.getMixins().values()) {
+            for (MemberShape member : shape.members()) {
+                if (member.getMemberName().equals(requiredMemberName)) {
+                    mostRecentMember = member;
+                    break; // break to the next mixin shape.
+                }
+            }
+        }
+
+        if (mostRecentMember == null) {
+            return null;
+        }
+
+        return MemberShape.builder()
+                .id(getId().withMember(requiredMemberName))
+                .target(mostRecentMember.getTarget())
+                .source(getSourceLocation())
+                .addMixin(mostRecentMember)
+                .build();
+    }
+
+    private SourceException missingRequiredMembersException(List<String> missingMembersNames) {
+        String missingRequired = missingMembersNames.size() > 1 ? "members" : "member";
+        String missingMembers = String.join(", ", missingMembersNames);
+        String message = String.format("Missing required %s of shape `%s`: %s",
+                missingRequired,
+                getId(),
+                missingMembers);
+        return new SourceException(message, getSourceLocation());
     }
 
     /**
@@ -72,15 +175,31 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      */
     private void validateShapeId(boolean expectMember) {
         if (expectMember) {
-            if (!getId().getMember().isPresent()) {
+            if (!getId().hasMember()) {
                 throw new SourceException(String.format(
                         "Shapes of type `%s` must contain a member in their shape ID. Found `%s`",
-                        getType(), getId()), getSourceLocation());
+                        getType(),
+                        getId()), getSourceLocation());
             }
-        } else if (getId().getMember().isPresent()) {
+        } else if (getId().hasMember()) {
             throw new SourceException(String.format(
                     "Shapes of type `%s` cannot contain a member in their shape ID. Found `%s`",
-                    getType(), getId()), getSourceLocation());
+                    getType(),
+                    getId()), getSourceLocation());
+        }
+    }
+
+    protected final void validateMemberShapeIds() {
+        for (MemberShape member : members()) {
+            if (!member.getId().toString().startsWith(getId().toString())) {
+                ShapeId expected = getId().withMember(member.getMemberName());
+                throw new SourceException(String.format(
+                        "Expected the `%s` member of `%s` to have an ID of `%s` but found `%s`",
+                        member.getMemberName(),
+                        getId(),
+                        expected,
+                        member.getId()), getSourceLocation());
+            }
         }
     }
 
@@ -103,18 +222,16 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      *
      * @return Returns the type;
      */
-    public final ShapeType getType() {
-        return type;
-    }
+    public abstract ShapeType getType();
 
     /**
      * Dispatches the shape to the appropriate {@link ShapeVisitor} method.
      *
      * @param <R> Return type of the accept.
-     * @param cases NeighborVisitor to use.
+     * @param visitor ShapeVisitor to use.
      * @return Returns the result.
      */
-    public abstract <R> R accept(ShapeVisitor<R> cases);
+    public abstract <R> R accept(ShapeVisitor<R> visitor);
 
     /**
      * Get the {@link ShapeId} of the shape.
@@ -211,7 +328,9 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      */
     public final <T extends Trait> T expectTrait(Class<T> traitClass) {
         return getTrait(traitClass).orElseThrow(() -> new ExpectationNotMetException(String.format(
-                "Expected shape `%s` to have a trait `%s`", getId(), traitClass.getCanonicalName()), this));
+                "Expected shape `%s` to have a trait `%s`",
+                getId(),
+                traitClass.getCanonicalName()), this));
     }
 
     /**
@@ -327,6 +446,13 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
     }
 
     /**
+     * @return Optionally returns the shape as a {@link IntEnumShape}.
+     */
+    public Optional<IntEnumShape> asIntEnumShape() {
+        return Optional.empty();
+    }
+
+    /**
      * @return Optionally returns the shape as a {@link ListShape}.
      */
     public Optional<ListShape> asListShape() {
@@ -336,6 +462,7 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
     /**
      * @return Optionally returns the shape as a {@link SetShape}.
      */
+    @Deprecated
     public Optional<SetShape> asSetShape() {
         return Optional.empty();
     }
@@ -386,6 +513,13 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      * @return Optionally returns the shape as a {@link StringShape}.
      */
     public Optional<StringShape> asStringShape() {
+        return Optional.empty();
+    }
+
+    /**
+     * @return Optionally returns the shape as a {@link EnumShape}.
+     */
+    public Optional<EnumShape> asEnumShape() {
         return Optional.empty();
     }
 
@@ -483,6 +617,7 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
     /**
      * @return Returns true if the shape is a {@link SetShape} shape.
      */
+    @Deprecated
     public final boolean isSetShape() {
         return getType() == ShapeType.SET;
     }
@@ -491,7 +626,14 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      * @return Returns true if the shape is a {@link IntegerShape} shape.
      */
     public final boolean isIntegerShape() {
-        return getType() == ShapeType.INTEGER;
+        return getType() == ShapeType.INTEGER || getType() == ShapeType.INT_ENUM;
+    }
+
+    /**
+     * @return Returns true if the shape is a {@link IntEnumShape} shape.
+     */
+    public final boolean isIntEnumShape() {
+        return getType() == ShapeType.INT_ENUM;
     }
 
     /**
@@ -540,7 +682,14 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
      * @return Returns true if the shape is a {@link StringShape} shape.
      */
     public final boolean isStringShape() {
-        return getType() == ShapeType.STRING;
+        return getType() == ShapeType.STRING || getType() == ShapeType.ENUM;
+    }
+
+    /**
+     * @return Returns true if the shape is an {@link EnumShape} shape.
+     */
+    public final boolean isEnumShape() {
+        return getType() == ShapeType.ENUM;
     }
 
     /**
@@ -565,12 +714,71 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
     }
 
     /**
-     * Gets all of the members contained in the shape.
+     * Gets all the members contained in the shape.
      *
      * @return Returns the members contained in the shape (if any).
      */
     public Collection<MemberShape> members() {
-        return Collections.emptyList();
+        return getAllMembers().values();
+    }
+
+    /**
+     * Get a specific member by name.
+     *
+     * <p>Shapes with no members return an empty Optional.
+     *
+     * @param name Name of the member to retrieve.
+     * @return Returns the optional member.
+     */
+    public Optional<MemberShape> getMember(String name) {
+        return Optional.ofNullable(getAllMembers().get(name));
+    }
+
+    /**
+     * Gets the members of the shape, including mixin members.
+     *
+     * @return Returns the immutable member map.
+     */
+    public Map<String, MemberShape> getAllMembers() {
+        return Collections.emptyMap();
+    }
+
+    /**
+     * Returns an ordered list of member names based on the order they are
+     * defined in the model, including mixin members.
+     *
+     * <p>The order in which map key and value members are returned might
+     * not match the order in which they were defined in the model because
+     * their ordering is insignificant.
+     *
+     * @return Returns an immutable list of member names.
+     */
+    public List<String> getMemberNames() {
+        List<String> result = memberNames;
+        if (result == null) {
+            result = ListUtils.copyOf(getAllMembers().keySet());
+            memberNames = result;
+        }
+        return result;
+    }
+
+    /**
+     * Get an ordered set of mixins attached to the shape.
+     *
+     * @return Returns the ordered mixin shape IDs.
+     */
+    public Set<ShapeId> getMixins() {
+        return mixins.keySet();
+    }
+
+    /**
+     * Gets the traits introduced by the shape and not inherited
+     * from mixins.
+     *
+     * @return Returns the introduced traits.
+     */
+    public Map<ShapeId, Trait> getIntroducedTraits() {
+        return introducedTraits;
     }
 
     @Override
@@ -600,7 +808,14 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
 
     @Override
     public int hashCode() {
-        return getId().hashCode() + 3 * getType().hashCode();
+        int h = hash;
+
+        if (h == 0) {
+            h = Objects.hash(getType(), getId());
+            hash = h;
+        }
+
+        return h;
     }
 
     @Override
@@ -609,11 +824,41 @@ public abstract class Shape implements FromSourceLocation, Tagged, ToShapeId, Co
             return true;
         } else if (!(o instanceof Shape)) {
             return false;
+        } else if (hashCode() != o.hashCode()) {
+            return false; // take advantage of hashcode caching
         }
 
         Shape other = (Shape) o;
-        return getId().equals(other.getId())
-               && getType() == other.getType()
-               && traits.equals(other.traits);
+        return getType() == other.getType()
+                && getId().equals(other.getId())
+                && getMemberNames().equals(other.getMemberNames())
+                && getAllMembers().equals(other.getAllMembers())
+                && getAllTraits().equals(other.getAllTraits())
+                && mixins.equals(other.mixins);
+    }
+
+    /**
+     * Copies the ID, source location, all traits, and mixins of the shape to the builder.
+     *
+     * @param builder Builder to update.
+     * @param <S> Type of shape being built.
+     * @param <B> Type of builder being built.
+     * @return Returns the builder.
+     */
+    <S extends Shape, B extends AbstractShapeBuilder<B, S>> B updateBuilder(B builder) {
+        builder.id(getId());
+        builder.source(getSourceLocation());
+        // Only add introduced traits to the builder to allow model load -> rebuild -> serialize roundtripping.
+        builder.addTraits(getIntroducedTraits().values());
+        builder.mixins(mixins.values());
+
+        // Add members to the builder that are not just strictly inherited from mixins.
+        for (MemberShape member : members()) {
+            if (member.getMixins().isEmpty() || !member.getIntroducedTraits().isEmpty()) {
+                builder.addMember(member);
+            }
+        }
+
+        return builder;
     }
 }

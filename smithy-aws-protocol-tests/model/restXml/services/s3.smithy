@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 metadata suppressions = [
     {
@@ -17,6 +17,7 @@ use aws.api#service
 use aws.auth#sigv4
 use aws.customizations#s3UnwrappedXmlOutput
 use aws.protocols#restXml
+use aws.protocols#httpChecksum
 use smithy.test#httpRequestTests
 use smithy.test#httpResponseTests
 
@@ -42,6 +43,8 @@ service AmazonS3 {
     operations: [
         ListObjectsV2,
         GetBucketLocation,
+        DeleteObjectTagging,
+        GetObject
     ],
 }
 
@@ -272,6 +275,138 @@ operation ListObjectsV2 {
 }
 
 
+@httpRequestTests([
+    {
+        id: "S3EscapeObjectKeyInUriLabel",
+        documentation: """
+            S3 clients should escape special characters in Object Keys
+            when the Object Key is used as a URI label binding.
+        """,
+        protocol: restXml,
+        method: "DELETE",
+        uri: "/my%20key.txt",
+        host: "s3.us-west-2.amazonaws.com",
+        resolvedHost: "mybucket.s3.us-west-2.amazonaws.com",
+        body: "",
+        queryParams: [
+            "tagging"
+        ],
+        params: {
+            Bucket: "mybucket",
+            Key: "my key.txt"
+        },
+        vendorParamsShape: aws.protocoltests.config#AwsConfig,
+        vendorParams: {
+            scopedConfig: {
+                client: {
+                    region: "us-west-2",
+                },
+            },
+        },
+    },
+    {
+        id: "S3EscapePathObjectKeyInUriLabel",
+        documentation: """
+            S3 clients should preserve an Object Key representing a path
+            when the Object Key is used as a URI label binding, but still
+            escape special characters.
+        """,
+        protocol: restXml,
+        method: "DELETE",
+        uri: "/foo/bar/my%20key.txt",
+        host: "s3.us-west-2.amazonaws.com",
+        resolvedHost: "mybucket.s3.us-west-2.amazonaws.com",
+        body: "",
+        queryParams: [
+            "tagging"
+        ],
+        params: {
+            Bucket: "mybucket",
+            Key: "foo/bar/my key.txt"
+        },
+        vendorParamsShape: aws.protocoltests.config#AwsConfig,
+        vendorParams: {
+            scopedConfig: {
+                client: {
+                    region: "us-west-2",
+                },
+            },
+        },
+    }
+])
+@http(
+    method: "DELETE",
+    uri: "/{Bucket}/{Key+}?tagging",
+    code: 204
+)
+operation DeleteObjectTagging {
+    input: DeleteObjectTaggingRequest
+    output: DeleteObjectTaggingOutput
+}
+
+@httpRequestTests([
+    {
+        id: "S3PreservesLeadingDotSegmentInUriLabel",
+        documentation: """
+            S3 clients should not remove dot segments from request paths.
+        """,
+        protocol: restXml,
+        method: "GET",
+        uri: "/../key.txt",
+        host: "s3.us-west-2.amazonaws.com",
+        resolvedHost: "mybucket.s3.us-west-2.amazonaws.com",
+        body: "",
+        params: {
+            Bucket: "mybucket",
+            Key: "../key.txt"
+        },
+        vendorParamsShape: aws.protocoltests.config#AwsConfig,
+        vendorParams: {
+            scopedConfig: {
+                client: {
+                    region: "us-west-2",
+                    s3: {
+                        addressing_style: "virtual",
+                    },
+                },
+            },
+        },
+    },
+    {
+        id: "S3PreservesEmbeddedDotSegmentInUriLabel",
+        documentation: """
+            S3 clients should not remove dot segments from request paths.
+        """,
+        protocol: restXml,
+        method: "GET",
+        uri: "/foo/../key.txt",
+        host: "s3.us-west-2.amazonaws.com",
+        resolvedHost: "mybucket.s3.us-west-2.amazonaws.com",
+        body: "",
+        params: {
+            Bucket: "mybucket",
+            Key: "foo/../key.txt"
+        },
+        vendorParamsShape: aws.protocoltests.config#AwsConfig,
+        vendorParams: {
+            scopedConfig: {
+                client: {
+                    region: "us-west-2",
+                    s3: {
+                        addressing_style: "virtual",
+                    },
+                },
+            },
+        },
+    }
+])
+@http(uri: "/{Bucket}/{Key+}",method: "GET")
+operation GetObject {
+    input: GetObjectRequest,
+    output: GetObjectOutput,
+}
+
+
 @httpResponseTests([{
         id: "GetBucketLocationUnwrappedOutput",
         documentation: """
@@ -369,6 +504,59 @@ structure ListObjectsV2Output {
     StartAfter: StartAfter,
 }
 
+@input
+structure GetObjectRequest {
+    @httpLabel
+    @required
+    Bucket: BucketName,
+
+    @httpLabel
+    @required
+    Key: ObjectKey,
+}
+
+@output
+structure GetObjectOutput {}
+
+@input
+structure DeleteObjectTaggingRequest {
+    @httpLabel
+    @required
+    Bucket: BucketName
+
+    @httpLabel
+    @required
+    Key: ObjectKey
+
+    @httpQuery("versionId")
+    VersionId: ObjectVersionId
+
+    @httpHeader("x-amz-expected-bucket-owner")
+    ExpectedBucketOwner: AccountId
+}
+
+@output
+structure DeleteObjectTaggingOutput {
+    @httpHeader("x-amz-version-id")
+    VersionId: ObjectVersionId
+}
+
+@httpResponseTests([
+    {
+        id: "S3OperationNoErrorWrappingResponse",
+        documentation: """
+            S3 operations return Error XML nodes unwrapped by
+            the ErrorResponse XML node.
+        """,
+        protocol: restXml,
+        code: 400,
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        body: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Error>\n\t<Type>Sender</Type>\n\t<Code>NoSuchBucket</Code>\n</Error>",
+        bodyMediaType: "application/xml",
+    }
+])
 @error("client")
 structure NoSuchBucket {}
 
@@ -408,13 +596,10 @@ string Delimiter
 
 string DisplayName
 
-@enum([
-    {
-        value: "url",
-        name: "url",
-    },
-])
-string EncodingType
+enum EncodingType {
+    @suppress(["EnumShape"])
+    url
+}
 
 string ETag
 
@@ -437,51 +622,23 @@ string NextToken
 )
 string ObjectKey
 
-@enum([
-    {
-        value: "STANDARD",
-        name: "STANDARD",
-    },
-    {
-        value: "REDUCED_REDUNDANCY",
-        name: "REDUCED_REDUNDANCY",
-    },
-    {
-        value: "GLACIER",
-        name: "GLACIER",
-    },
-    {
-        value: "STANDARD_IA",
-        name: "STANDARD_IA",
-    },
-    {
-        value: "ONEZONE_IA",
-        name: "ONEZONE_IA",
-    },
-    {
-        value: "INTELLIGENT_TIERING",
-        name: "INTELLIGENT_TIERING",
-    },
-    {
-        value: "DEEP_ARCHIVE",
-        name: "DEEP_ARCHIVE",
-    },
-    {
-        value: "OUTPOSTS",
-        name: "OUTPOSTS",
-    },
-])
-string ObjectStorageClass
+enum ObjectStorageClass {
+    STANDARD
+    REDUCED_REDUNDANCY
+    GLACIER
+    STANDARD_IA
+    ONEZONE_IA
+    INTELLIGENT_TIERING
+    DEEP_ARCHIVE
+    OUTPOSTS
+}
 
 string Prefix
 
-@enum([
-    {
-        value: "requester",
-        name: "requester",
-    },
-])
-string RequestPayer
+enum RequestPayer {
+    @suppress(["EnumShape"])
+    requester
+}
 
 integer Size
 
@@ -489,7 +646,10 @@ string StartAfter
 
 string Token
 
-@enum([
-    { value: "us-west-2", name: "us_west_2" }
-])
-string BucketLocationConstraint
+enum BucketLocationConstraint {
+    @suppress(["EnumShape"])
+    us_west_2 = "us-west-2"
+}
+
+string ObjectVersionId
+

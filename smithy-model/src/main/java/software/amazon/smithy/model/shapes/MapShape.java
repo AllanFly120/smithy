@@ -1,26 +1,24 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.shapes;
 
+import java.util.AbstractMap;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
+import software.amazon.smithy.model.SourceException;
+import software.amazon.smithy.model.SourceLocation;
+import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.ListUtils;
-import software.amazon.smithy.utils.SmithyBuilder;
+import software.amazon.smithy.utils.Pair;
+import software.amazon.smithy.utils.SetUtils;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 /**
@@ -30,25 +28,14 @@ public final class MapShape extends Shape implements ToSmithyBuilder<MapShape> {
 
     private final MemberShape key;
     private final MemberShape value;
+    private transient Map<String, MemberShape> memberMap;
 
     private MapShape(Builder builder) {
         super(builder, false);
-        key = SmithyBuilder.requiredState("key", builder.key);
-        value = SmithyBuilder.requiredState("value", builder.value);
-
-        ShapeId expectedKey = getId().withMember("key");
-        if (!key.getId().equals(expectedKey)) {
-            throw new IllegalArgumentException(String.format(
-                    "Expected the key member of `%s` to have an ID of `%s` but found `%s`",
-                    getId(), expectedKey, key.getId()));
-        }
-
-        ShapeId expectedValue = getId().withMember("value");
-        if (!value.getId().equals(expectedValue)) {
-            throw new IllegalArgumentException(String.format(
-                    "Expected the value member of `%s` to have an ID of `%s` but found `%s`",
-                    getId(), expectedValue, value.getId()));
-        }
+        MemberShape[] members = getRequiredMembers(builder, "key", "value");
+        key = members[0];
+        value = members[1];
+        validateMemberShapeIds();
     }
 
     public static Builder builder() {
@@ -57,17 +44,22 @@ public final class MapShape extends Shape implements ToSmithyBuilder<MapShape> {
 
     @Override
     public Builder toBuilder() {
-        return builder().from(this).key(key).value(value);
+        return updateBuilder(builder()).key(key).value(value);
     }
 
     @Override
-    public <R> R accept(ShapeVisitor<R> cases) {
-        return cases.mapShape(this);
+    public <R> R accept(ShapeVisitor<R> visitor) {
+        return visitor.mapShape(this);
     }
 
     @Override
     public Optional<MapShape> asMapShape() {
         return Optional.of(this);
+    }
+
+    @Override
+    public ShapeType getType() {
+        return ShapeType.MAP;
     }
 
     /**
@@ -89,20 +81,71 @@ public final class MapShape extends Shape implements ToSmithyBuilder<MapShape> {
     }
 
     @Override
-    public Collection<MemberShape> members() {
-        return ListUtils.of(key, value);
+    public Optional<MemberShape> getMember(String memberName) {
+        if ("key".equals(memberName)) {
+            return Optional.of(key);
+        }
+        if ("value".equals(memberName)) {
+            return Optional.of(value);
+        }
+        return Optional.empty();
     }
 
     @Override
-    public boolean equals(Object other) {
-        if (!super.equals(other)) {
-            return false;
-        } else {
-            MapShape otherShape = (MapShape) other;
-            return super.equals(otherShape)
-                    && getKey().equals(otherShape.getKey())
-                    && getValue().equals(((MapShape) other).getValue());
+    public Map<String, MemberShape> getAllMembers() {
+        Map<String, MemberShape> result = memberMap;
+
+        // Create a two-entry map that only knows about "key" and "value".
+        if (result == null) {
+            result = new AbstractMap<String, MemberShape>() {
+                private transient Set<Entry<String, MemberShape>> entries;
+                private transient List<MemberShape> values;
+
+                @Override
+                public MemberShape get(Object keyName) {
+                    if ("key".equals(keyName)) {
+                        return key;
+                    } else if ("value".equals(keyName)) {
+                        return value;
+                    } else {
+                        return null;
+                    }
+                }
+
+                @Override
+                public boolean containsKey(Object keyName) {
+                    return "key".equals(keyName) || "value".equals(keyName);
+                }
+
+                @Override
+                public Set<String> keySet() {
+                    return SetUtils.of("key", "value");
+                }
+
+                @Override
+                public Collection<MemberShape> values() {
+                    List<MemberShape> result = values;
+                    if (result == null) {
+                        result = ListUtils.of(key, value);
+                        values = result;
+                    }
+                    return result;
+                }
+
+                @Override
+                public Set<Entry<String, MemberShape>> entrySet() {
+                    Set<Entry<String, MemberShape>> result = entries;
+                    if (result == null) {
+                        result = SetUtils.of(Pair.of("key", key), Pair.of("value", value));
+                        entries = result;
+                    }
+                    return result;
+                }
+            };
+            memberMap = result;
         }
+
+        return result;
     }
 
     /**
@@ -121,6 +164,17 @@ public final class MapShape extends Shape implements ToSmithyBuilder<MapShape> {
         @Override
         public ShapeType getShapeType() {
             return ShapeType.MAP;
+        }
+
+        @Override
+        public Optional<MemberShape> getMember(String memberName) {
+            if ("key".equals(memberName)) {
+                return Optional.ofNullable(key);
+            } else if ("value".equals(memberName)) {
+                return Optional.ofNullable(value);
+            } else {
+                return Optional.empty();
+            }
         }
 
         @Override
@@ -152,8 +206,17 @@ public final class MapShape extends Shape implements ToSmithyBuilder<MapShape> {
             } else if (member.getMemberName().equals("value")) {
                 return value(member);
             } else {
-                throw new IllegalStateException("Invalid member given to MapShape builder: " + member.getId());
+                String message = String.format("Map shapes may only have `key` and `value` members, but found `%s`",
+                        member.getMemberName());
+                throw new SourceException(message, member);
             }
+        }
+
+        @Override
+        public Builder clearMembers() {
+            key = null;
+            value = null;
+            return this;
         }
 
         /**
@@ -220,6 +283,42 @@ public final class MapShape extends Shape implements ToSmithyBuilder<MapShape> {
             }
 
             return value(builder.build());
+        }
+
+        @Override
+        public Builder flattenMixins() {
+            if (getMixins().isEmpty()) {
+                return this;
+            }
+
+            for (Shape mixin : getMixins().values()) {
+                for (MemberShape member : mixin.members()) {
+                    SourceLocation location = getSourceLocation();
+                    Collection<Trait> localTraits = Collections.emptyList();
+
+                    MemberShape existing;
+                    if (member.getMemberName().equals("key")) {
+                        existing = key;
+                    } else {
+                        existing = value;
+                    }
+
+                    if (existing != null) {
+                        localTraits = existing.getIntroducedTraits().values();
+                        location = existing.getSourceLocation();
+                    }
+
+                    addMember(MemberShape.builder()
+                            .id(getId().withMember(member.getMemberName()))
+                            .target(member.getTarget())
+                            .addTraits(member.getAllTraits().values())
+                            .addTraits(localTraits)
+                            .source(location)
+                            .build());
+                }
+            }
+
+            return super.flattenMixins();
         }
     }
 }

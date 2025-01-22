@@ -1,3 +1,7 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.waiters;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -63,8 +67,6 @@ public class ModelRuntimeTypeGeneratorTest {
         return Arrays.asList(new Object[][] {
                 {"StringList", Arrays.asList("aa", "aa")},
                 {"SizedStringList", Arrays.asList("aa", "aa", "aa", "aa", "aa")},
-                {"StringSet", Arrays.asList("aa", "aa")},
-                {"SizedStringSet", Arrays.asList("aa", "aa", "aa", "aa", "aa")},
                 {"StringListMap", stringListMap},
                 {"SizedStringListMap", sizedStringListMap},
                 {"SizedString1", "aaaa"},

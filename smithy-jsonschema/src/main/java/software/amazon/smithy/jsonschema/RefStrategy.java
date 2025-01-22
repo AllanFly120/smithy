@@ -1,20 +1,10 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.jsonschema;
 
+import java.util.function.Predicate;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -70,14 +60,16 @@ interface RefStrategy {
      * @param model Model being converted.
      * @param config Conversion configuration.
      * @param propertyNamingStrategy Property naming strategy.
+     * @param shapePredicate a predicate to use to filter shapes in model when determining conflicts.
      * @return Returns the created strategy.
      */
     static RefStrategy createDefaultStrategy(
             Model model,
             JsonSchemaConfig config,
-            PropertyNamingStrategy propertyNamingStrategy
+            PropertyNamingStrategy propertyNamingStrategy,
+            Predicate<Shape> shapePredicate
     ) {
         RefStrategy delegate = new DefaultRefStrategy(model, config, propertyNamingStrategy);
-        return new DeconflictingStrategy(model, delegate);
+        return new DeconflictingStrategy(model, delegate, shapePredicate);
     }
 }

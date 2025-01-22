@@ -1,26 +1,16 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.codegen.core;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.smithy.utils.BuilderRef;
+import software.amazon.smithy.utils.SetUtils;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
@@ -90,19 +80,15 @@ public final class SymbolReference
     }
 
     private SymbolReference(Builder builder) {
-        super(builder.properties);
+        super(builder);
         this.symbol = SmithyBuilder.requiredState("symbol", builder.symbol);
         this.alias = builder.alias == null ? builder.symbol.getName() : builder.alias;
 
-        Set<Option> opts = new HashSet<>(builder.options.size() + 2);
-        if (builder.options.size() == 0) {
-            opts.add(ContextOption.USE);
-            opts.add(ContextOption.DECLARE);
+        if (!builder.options.hasValue() || builder.options.peek().isEmpty()) {
+            this.options = SetUtils.of(ContextOption.USE, ContextOption.DECLARE);
         } else {
-            opts.addAll(builder.options);
+            this.options = builder.options.copy();
         }
-
-        this.options = Collections.unmodifiableSet(opts);
     }
 
     /**
@@ -172,6 +158,7 @@ public final class SymbolReference
                 .symbol(symbol)
                 .options(options)
                 .properties(getProperties())
+                .typedProperties(getTypedProperties())
                 .alias(alias);
     }
 
@@ -185,10 +172,10 @@ public final class SymbolReference
 
         SymbolReference that = (SymbolReference) o;
         return super.equals(o)
-               && symbol.equals(that.symbol)
-               && getProperties().equals(that.getProperties())
-               && options.equals(that.options)
-               && alias.equals(that.alias);
+                && symbol.equals(that.symbol)
+                && getProperties().equals(that.getProperties())
+                && options.equals(that.options)
+                && alias.equals(that.alias);
     }
 
     @Override
@@ -209,7 +196,7 @@ public final class SymbolReference
             implements SmithyBuilder<SymbolReference> {
 
         private Symbol symbol;
-        private Set<Option> options = new HashSet<>();
+        private final BuilderRef<Set<Option>> options = BuilderRef.forUnorderedSet();
         private String alias;
 
         private Builder() {}
@@ -231,25 +218,26 @@ public final class SymbolReference
         }
 
         /**
-         * Adds a Set of Options to the SymbolReference.
+         * Replaces the Set of Options to the SymbolReference.
          *
          * @param options Options to add.
          * @return Returns the builder.
          */
         public Builder options(Set<Option> options) {
-            this.options = options;
+            this.options.clear();
+            this.options.get().addAll(options);
             return this;
         }
 
         /**
-         * Adds an array of Options to the SymbolReference.
+         * Replaces the array of Options in the SymbolReference.
          *
          * @param options Options to add.
          * @return Returns the builder.
          */
         public Builder options(Option... options) {
-            this.options = new HashSet<>();
-            Collections.addAll(this.options, options);
+            this.options.clear();
+            Collections.addAll(this.options.get(), options);
             return this;
         }
 

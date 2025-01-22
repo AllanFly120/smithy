@@ -1,4 +1,4 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson
 
@@ -36,7 +36,7 @@ apply MalformedContentTypeWithBody @httpMalformedRequestTests([
     {
         id: "RestJsonWithBodyExpectsApplicationJsonContentType",
         documentation: """
-        When there is modeled input, they content type must be application/json""",
+        When there is modeled input, the content type must be application/json""",
         protocol: restJson1,
         request: {
             method: "POST",
@@ -46,6 +46,24 @@ apply MalformedContentTypeWithBody @httpMalformedRequestTests([
                 // this should be application/json
                 "content-type": "application/hal+json"
             }
+        },
+        response: {
+            code: 415,
+            headers: {
+                "x-amzn-errortype": "UnsupportedMediaTypeException"
+            }
+        },
+        tags: [ "content-type" ]
+    }
+    {
+        id: "RestJsonWithBodyExpectsApplicationJsonContentTypeNoHeaders",
+        documentation: """
+        When there is modeled input, the content type must be application/json""",
+        protocol: restJson1,
+        request: {
+            method: "POST",
+            uri: "/MalformedContentTypeWithBody",
+            body: "{}",
         },
         response: {
             code: 415,
@@ -82,7 +100,7 @@ apply MalformedContentTypeWithPayload @httpMalformedRequestTests([
     }
 ])
 
-apply MalformedContentTypeWithGenericString @httpMalformedRequestTests([
+apply MalformedContentTypeWithPayload @httpMalformedRequestTests([
     {
         id: "RestJsonWithPayloadExpectsImpliedContentType",
         documentation: """
@@ -108,14 +126,42 @@ apply MalformedContentTypeWithGenericString @httpMalformedRequestTests([
     }
 ])
 
+apply MalformedContentTypeWithoutBodyEmptyInput @httpMalformedRequestTests([
+    {
+        id: "RestJsonWithoutBodyEmptyInputExpectsEmptyContentType",
+        documentation: """
+        When there is no modeled body input, content type must not be set and the body must be empty.""",
+        protocol: restJson1,
+        request: {
+            method: "POST",
+            uri: "/MalformedContentTypeWithoutBodyEmptyInput",
+            body: "{}",
+            headers: {
+                // this should be omitted
+                "content-type": "application/json"
+            }
+        },
+        response: {
+            code: 415,
+            headers: {
+                "x-amzn-errortype": "UnsupportedMediaTypeException"
+            }
+        },
+        tags: [ "content-type" ]
+    }
+])
+
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedContentTypeWithoutBody")
 operation MalformedContentTypeWithoutBody {}
 
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedContentTypeWithBody")
 operation MalformedContentTypeWithBody {
     input: GreetingStruct
 }
 
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedContentTypeWithPayload")
 operation MalformedContentTypeWithPayload {
     input: MalformedContentTypeWithPayloadInput
@@ -126,6 +172,7 @@ structure MalformedContentTypeWithPayloadInput {
     payload: JpegBlob
 }
 
+@suppress(["UnstableTrait"])
 @http(method: "POST", uri: "/MalformedContentTypeWithGenericString")
 operation MalformedContentTypeWithGenericString {
     input: MalformedContentTypeWithGenericStringInput
@@ -134,4 +181,15 @@ operation MalformedContentTypeWithGenericString {
 structure MalformedContentTypeWithGenericStringInput {
     @httpPayload
     payload: String
+}
+
+@suppress(["UnstableTrait"])
+@http(method: "POST", uri: "/MalformedContentTypeWithoutBodyEmptyInput")
+operation MalformedContentTypeWithoutBodyEmptyInput {
+    input: MalformedContentTypeWithoutBodyEmptyInputInput
+}
+
+structure MalformedContentTypeWithoutBodyEmptyInputInput {
+    @httpHeader("header")
+    header: String
 }

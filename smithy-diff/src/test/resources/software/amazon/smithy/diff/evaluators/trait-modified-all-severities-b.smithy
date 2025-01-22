@@ -1,3 +1,5 @@
+$version: "2.0"
+
 namespace smithy.example
 
 @aTrait(
@@ -54,4 +56,7 @@ structure aTrait {
 
     @tags(["diff.warning.const"])
     l: String,
+
+    @tags(["diff.contents"])
+    m: String,
 }

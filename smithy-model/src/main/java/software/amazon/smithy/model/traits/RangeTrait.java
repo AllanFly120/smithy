@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
 import java.math.BigDecimal;
@@ -110,12 +99,18 @@ public final class RangeTrait extends AbstractTrait implements ToSmithyBuilder<R
 
         @Override
         public RangeTrait createTrait(ShapeId target, Node value) {
-            ObjectNode objectNode = value.expectObjectNode();
-            BigDecimal minValue = objectNode.getMember("min")
-                    .map(node -> new BigDecimal(node.expectNumberNode().getValue().toString())).orElse(null);
-            BigDecimal maxValue = objectNode.getMember("max")
-                    .map(node -> new BigDecimal(node.expectNumberNode().getValue().toString())).orElse(null);
-            return builder().sourceLocation(value).min(minValue).max(maxValue).build();
+            Builder builder = builder().sourceLocation(value.getSourceLocation());
+            value.expectObjectNode()
+                    .getMember("min", Provider::convertToBigDecimal, builder::min)
+                    .getMember("max", Provider::convertToBigDecimal, builder::max);
+            RangeTrait result = builder.build();
+            result.setNodeCache(value);
+            return result;
+        }
+
+        private static BigDecimal convertToBigDecimal(Node number) {
+            Number value = number.expectNumberNode().getValue();
+            return value instanceof BigDecimal ? (BigDecimal) value : new BigDecimal(value.toString());
         }
     }
 }

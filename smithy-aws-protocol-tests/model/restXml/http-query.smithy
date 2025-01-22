@@ -1,8 +1,8 @@
 // This file defines test cases that test HTTP query string bindings.
-// See: https://awslabs.github.io/smithy/1.0/spec/http.html#httpquery-trait and
-// https://awslabs.github.io/smithy/1.0/spec/http.html#httpqueryparams-trait
+// See: https://smithy.io/2.0/spec/http-bindings.html#httpquery-trait and
+// https://smithy.io/2.0/spec/http-bindings.html#httpqueryparams-trait
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restxml
 
@@ -11,6 +11,8 @@ use aws.protocoltests.shared#BooleanList
 use aws.protocoltests.shared#DoubleList
 use aws.protocoltests.shared#FooEnum
 use aws.protocoltests.shared#FooEnumList
+use aws.protocoltests.shared#IntegerEnum
+use aws.protocoltests.shared#IntegerEnumList
 use aws.protocoltests.shared#IntegerList
 use aws.protocoltests.shared#IntegerSet
 use aws.protocoltests.shared#StringList
@@ -71,6 +73,9 @@ apply AllQueryStringTypes @httpRequestTests([
             "EnumList=Foo",
             "EnumList=Baz",
             "EnumList=Bar",
+            "IntegerEnum=1",
+            "IntegerEnumList=1",
+            "IntegerEnumList=2",
         ],
         params: {
             queryString: "Hello there",
@@ -91,6 +96,8 @@ apply AllQueryStringTypes @httpRequestTests([
             queryTimestampList: [1, 2, 3],
             queryEnum: "Foo",
             queryEnumList: ["Foo", "Baz", "Bar"],
+            queryIntegerEnum: 1,
+            queryIntegerEnumList: [1, 2],
         }
     },
     {
@@ -109,6 +116,20 @@ apply AllQueryStringTypes @httpRequestTests([
                 "QueryParamsStringKeyA": "Foo",
                 "QueryParamsStringKeyB": "Bar",
             },
+        }
+    },
+    {
+        id: "RestXmlQueryStringEscaping",
+        documentation: "Handles escaping all required characters in the query string.",
+        protocol: restXml,
+        method: "GET",
+        uri: "/AllQueryStringTypesInput",
+        body: "",
+        queryParams: [
+            "String=%20%25%3A%2F%3F%23%5B%5D%40%21%24%26%27%28%29%2A%2B%2C%3B%3D%F0%9F%98%B9",
+        ],
+        params: {
+            queryString: " %:/?#[]@!$&'()*+,;=😹",
         }
     },
     {
@@ -159,6 +180,22 @@ apply AllQueryStringTypes @httpRequestTests([
             queryDouble: "-Infinity",
         }
     },
+    {
+        id: "RestXmlZeroAndFalseQueryValues"
+        documentation: "Query values of 0 and false are serialized"
+        protocol: restXml
+        method: "GET"
+        uri: "/AllQueryStringTypesInput"
+        body: ""
+        queryParams: [
+            "Integer=0"
+            "Boolean=false"
+        ]
+        params: {
+            queryInteger: 0
+            queryBoolean: false
+        }
+    }
 ])
 
 @suppress(["HttpQueryParamsTrait"])
@@ -216,6 +253,12 @@ structure AllQueryStringTypesInput {
 
     @httpQuery("EnumList")
     queryEnumList: FooEnumList,
+
+    @httpQuery("IntegerEnum")
+    queryIntegerEnum: IntegerEnum,
+
+    @httpQuery("IntegerEnumList")
+    queryIntegerEnumList: IntegerEnumList,
 
     @httpQueryParams
     queryParamsMapOfStrings: StringMap,
@@ -335,6 +378,7 @@ apply IgnoreQueryParamsInResponse @httpResponseTests([
 
 structure IgnoreQueryParamsInResponseOutput {
     @httpQuery("baz")
+    @suppress(["HttpBindingTraitIgnored"])
     baz: String
 }
 

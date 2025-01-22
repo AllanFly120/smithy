@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.aws.apigateway.openapi;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -22,7 +11,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -66,6 +54,8 @@ public class AddAuthorizersTest {
         assertThat(authorizer.getStringMember("identitySource").get().getValue(), equalTo("mapping.expression"));
         assertThat(authorizer.getStringMember("identityValidationExpression").get().getValue(), equalTo("[A-Z]+"));
         assertThat(authorizer.getNumberMember("authorizerResultTtlInSeconds").get().getValue(), equalTo(100));
+        assertThat(authorizer.getStringMember("authorizerPayloadFormatVersion").get().getValue(), equalTo("2.0"));
+        assertThat(authorizer.getBooleanMember("enableSimpleResponses").get().getValue(), equalTo(true));
     }
 
     @Test
@@ -177,6 +167,6 @@ public class AddAuthorizersTest {
         assertThat(result.getPaths().get("/operationA").getGet().get().getSecurity(), is(Optional.empty()));
         // The security schemes of operationB must be "baz".
         assertThat(result.getPaths().get("/operationB").getGet().get().getSecurity(),
-                   is(Optional.of(ListUtils.of(MapUtils.of("baz", ListUtils.of())))));
+                is(Optional.of(ListUtils.of(MapUtils.of("baz", ListUtils.of())))));
     }
 }

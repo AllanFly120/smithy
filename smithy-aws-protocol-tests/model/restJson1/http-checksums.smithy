@@ -1,6 +1,6 @@
 // This file defines test cases that test HTTP checksum trait(s).
-// See: https://awslabs.github.io/smithy/1.0/spec/core/behavior-traits.html#httpchecksumrequired-trait
-$version: "1.0"
+// See: https://smithy.io/2.0/spec/http-bindings.html#httpchecksumrequired-trait
+$version: "2.0"
 
 namespace aws.protocoltests.restjson
 
@@ -8,6 +8,7 @@ use aws.protocols#restJson1
 use smithy.test#httpRequestTests
 
 /// This example tests httpChecksumRequired trait
+@suppress(["UnstableTrait"])
 @httpChecksumRequired
 @http(uri: "/HttpChecksumRequired", method: "POST")
 operation HttpChecksumRequired {

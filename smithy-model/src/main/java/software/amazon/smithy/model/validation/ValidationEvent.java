@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.validation;
 
 import static software.amazon.smithy.model.validation.Severity.ERROR;
@@ -25,7 +14,6 @@ import software.amazon.smithy.model.SourceException;
 import software.amazon.smithy.model.SourceLocation;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
-import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.node.ToNode;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
@@ -40,7 +28,8 @@ import software.amazon.smithy.utils.ToSmithyBuilder;
  * Events with a severity less than ERROR can be suppressed. All events contain
  * a message, severity, and eventId.
  */
-public final class ValidationEvent implements Comparable<ValidationEvent>, ToNode, ToSmithyBuilder<ValidationEvent> {
+public final class ValidationEvent
+        implements FromSourceLocation, Comparable<ValidationEvent>, ToNode, ToSmithyBuilder<ValidationEvent> {
     private static final ValidationEventFormatter DEFAULT_FORMATTER = new LineValidationEventFormatter();
     private final SourceLocation sourceLocation;
     private final String message;
@@ -48,6 +37,7 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
     private final Severity severity;
     private final ShapeId shapeId;
     private final String suppressionReason;
+    private final String hint;
     private int hash;
 
     private ValidationEvent(Builder builder) {
@@ -61,6 +51,7 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
         this.eventId = SmithyBuilder.requiredState("id", builder.eventId);
         this.shapeId = builder.shapeId;
         this.suppressionReason = builder.suppressionReason;
+        this.hint = builder.hint;
     }
 
     public static Builder builder() {
@@ -85,12 +76,29 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
      * @return Returns a created validation event with an ID of Model.
      */
     public static ValidationEvent fromSourceException(SourceException exception, String prefix) {
+        // Extract shape IDs from exceptions that implement ToShapeId.
+        ShapeId id = (exception instanceof ToShapeId)
+                ? ((ToShapeId) exception).toShapeId()
+                : null;
+        return fromSourceException(exception, prefix, id);
+    }
+
+    /**
+     * Creates a new ValidationEvent from a {@link SourceException}.
+     *
+     * @param exception Exception to use to create the event.
+     * @param prefix Prefix string to add to the message.
+     * @param shapeId ShapeId to associate with the event.
+     * @return Returns a created validation event with an ID of Model.
+     */
+    public static ValidationEvent fromSourceException(SourceException exception, String prefix, ShapeId shapeId) {
         // Get the message without source location since it's in the event.
         return ValidationEvent.builder()
                 .id(MODEL_ERROR)
                 .severity(ERROR)
                 .message(prefix + exception.getMessageWithoutLocation())
                 .sourceLocation(exception.getSourceLocation())
+                .shapeId(shapeId)
                 .build();
     }
 
@@ -124,6 +132,7 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
         builder.eventId = eventId;
         builder.shapeId = shapeId;
         builder.suppressionReason = suppressionReason;
+        builder.hint = hint;
         return builder;
     }
 
@@ -141,14 +150,15 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
                 && severity.equals(other.severity)
                 && eventId.equals(other.eventId)
                 && getShapeId().equals(other.getShapeId())
-                && getSuppressionReason().equals(other.getSuppressionReason());
+                && getSuppressionReason().equals(other.getSuppressionReason())
+                && getHint().equals(other.getHint());
     }
 
     @Override
     public int hashCode() {
         int result = hash;
         if (result == 0) {
-            result = Objects.hash(eventId, shapeId, severity, sourceLocation, message, suppressionReason);
+            result = Objects.hash(eventId, shapeId, severity, sourceLocation, message, suppressionReason, hint);
             hash = result;
         }
         return result;
@@ -167,6 +177,7 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
                 .withOptionalMember("shapeId", getShapeId().map(Object::toString).map(Node::from))
                 .withMember("message", Node.from(getMessage()))
                 .withOptionalMember("suppressionReason", getSuppressionReason().map(Node::from))
+                .withOptionalMember("hint", getHint().map(Node::from))
                 .withMember("filename", Node.from(getSourceLocation().getFilename()))
                 .withMember("line", Node.from(getSourceLocation().getLine()))
                 .withMember("column", Node.from(getSourceLocation().getColumn()))
@@ -183,22 +194,13 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
                 objectNode.expectStringMember("filename").getValue(),
                 objectNode.getNumberMemberOrDefault("line", 0).intValue(),
                 objectNode.getNumberMemberOrDefault("column", 0).intValue());
-
-        // Set required properties.
-        Builder builder = builder()
-                .id(objectNode.expectStringMember("id").getValue())
-                .severity(Severity.valueOf(objectNode.expectStringMember("severity").getValue()))
-                .message(objectNode.expectStringMember("message").getValue())
-                .sourceLocation(location);
-
-        // Set optional properties.
-        objectNode.getStringMember("suppressionReason").map(StringNode::getValue)
-                .ifPresent(builder::suppressionReason);
-        objectNode.getStringMember("shapeId")
-                .map(StringNode::getValue)
-                .map(ShapeId::from)
-                .ifPresent(builder::shapeId);
-
+        Builder builder = builder().sourceLocation(location);
+        objectNode.expectStringMember("id", builder::id)
+                .expectMember("severity", Severity::fromNode, builder::severity)
+                .expectStringMember("message", builder::message)
+                .getStringMember("suppressionReason", builder::suppressionReason)
+                .getStringMember("hint", builder::hint)
+                .getMember("shapeId", ShapeId::fromNode, builder::shapeId);
         return builder.build();
     }
 
@@ -236,6 +238,31 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
     }
 
     /**
+     * Tests if the event ID hierarchically contains the given ID.
+     *
+     * <p>Event IDs that contain dots (.) are hierarchical. An event ID of
+     * {@code "Foo.Bar"} contains the ID {@code "Foo"} and {@code "Foo.Bar"}.
+     * However, an event ID of {@code "Foo"} does not contain the ID
+     * {@code "Foo.Bar"} as {@code "Foo.Bar"} is more specific than {@code "Foo"}.
+     * If an event ID exactly matches the given {@code id}, then it also contains
+     * the ID (for example, {@code "Foo.Bar."} contains {@code "Foo.Bar."}.
+     *
+     * @param id ID to test.
+     * @return Returns true if the event's event ID contains the given {@code id}.
+     */
+    public boolean containsId(String id) {
+        int eventLength = eventId.length();
+        int suppressionLength = id.length();
+        if (suppressionLength == eventLength) {
+            return id.equals(eventId);
+        } else if (suppressionLength > eventLength) {
+            return false;
+        } else {
+            return eventId.startsWith(id) && eventId.charAt(id.length()) == '.';
+        }
+    }
+
+    /**
      * Returns the identifier of the validation event.
      *
      * <p>The validation event identifier can be used to suppress events.
@@ -263,6 +290,15 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
     }
 
     /**
+     * Get an optional hint that adds more detail about how to fix a specific issue.
+     *
+     * @return Returns the hint if available.
+     */
+    public Optional<String> getHint() {
+        return Optional.ofNullable(hint);
+    }
+
+    /**
      * Builds ValidationEvent values.
      */
     public static final class Builder implements SmithyBuilder<ValidationEvent> {
@@ -273,6 +309,7 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
         private String eventId;
         private ShapeId shapeId;
         private String suppressionReason;
+        private String hint;
 
         private Builder() {}
 
@@ -367,6 +404,17 @@ public final class ValidationEvent implements Comparable<ValidationEvent>, ToNod
          */
         public Builder suppressionReason(String eventSuppressionReason) {
             suppressionReason = eventSuppressionReason;
+            return this;
+        }
+
+        /**
+         * Sets an optional hint adding more detail about how to fix a specific issue.
+         *
+         * @param hint Hint to set
+         * @return Returns the builder.
+         */
+        public Builder hint(String hint) {
+            this.hint = hint;
             return this;
         }
 

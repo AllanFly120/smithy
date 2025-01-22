@@ -1,21 +1,9 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.waiters;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
@@ -24,8 +12,7 @@ import software.amazon.smithy.model.traits.AbstractTrait;
 import software.amazon.smithy.model.traits.AbstractTraitBuilder;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.model.traits.TraitService;
-import software.amazon.smithy.utils.MapUtils;
-import software.amazon.smithy.utils.SmithyBuilder;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
 /**
@@ -40,7 +27,7 @@ public final class WaitableTrait extends AbstractTrait implements ToSmithyBuilde
 
     private WaitableTrait(Builder builder) {
         super(ID, builder.getSourceLocation());
-        this.waiters = MapUtils.orderedCopyOf(builder.waiters);
+        this.waiters = builder.waiters.copy();
     }
 
     public static Builder builder() {
@@ -48,7 +35,7 @@ public final class WaitableTrait extends AbstractTrait implements ToSmithyBuilde
     }
 
     @Override
-    public SmithyBuilder<WaitableTrait> toBuilder() {
+    public Builder toBuilder() {
         return new Builder().sourceLocation(getSourceLocation()).replace(waiters);
     }
 
@@ -73,7 +60,7 @@ public final class WaitableTrait extends AbstractTrait implements ToSmithyBuilde
 
     public static final class Builder extends AbstractTraitBuilder<WaitableTrait, Builder> {
 
-        private final Map<String, Waiter> waiters = new LinkedHashMap<>();
+        private final BuilderRef<Map<String, Waiter>> waiters = BuilderRef.forOrderedMap();
 
         private Builder() {}
 
@@ -83,7 +70,7 @@ public final class WaitableTrait extends AbstractTrait implements ToSmithyBuilde
         }
 
         public Builder put(String name, Waiter value) {
-            waiters.put(name, value);
+            waiters.get().put(name, value);
             return this;
         }
 
@@ -94,7 +81,7 @@ public final class WaitableTrait extends AbstractTrait implements ToSmithyBuilde
 
         public Builder replace(Map<String, Waiter> waiters) {
             clear();
-            this.waiters.putAll(waiters);
+            this.waiters.get().putAll(waiters);
             return this;
         }
     }
@@ -112,7 +99,9 @@ public final class WaitableTrait extends AbstractTrait implements ToSmithyBuilde
             for (Map.Entry<String, Node> entry : node.getStringMap().entrySet()) {
                 builder.put(entry.getKey(), Waiter.fromNode(entry.getValue()));
             }
-            return builder.build();
+            WaitableTrait result = builder.build();
+            result.setNodeCache(value);
+            return result;
         }
     }
 }

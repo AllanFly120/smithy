@@ -1,19 +1,19 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace ns.foo
 
 service EmptyService {
-    version: "2020-02-18",
+    version: "2020-02-18"
 }
 
 service MyService {
-    version: "2020-02-18",
+    version: "2020-02-18"
     operations: [
-        MyOperation,
-    ],
+        MyOperation
+    ]
     resources: [
-        MyResource,
-    ],
+        MyResource
+    ]
 }
 
 resource EmptyResource {
@@ -21,56 +21,77 @@ resource EmptyResource {
 
 resource MyResource {
     identifiers: {
-        id: String,
-    },
-    put: ResourceOperation,
-    create: ResourceOperation,
-    read: ReadonlyResourceOperation,
-    update: ResourceOperation,
-    delete: ResourceOperation,
-    list: ReadonlyResourceOperation,
+        id: String
+    }
+    put: ResourceOperation
+    create: EmptyOperation
+    read: ReadonlyResourceOperation
+    update: ResourceOperation
+    delete: ResourceOperation
+    list: CollectionResourceOperation
     operations: [
-        ResourceOperation,
-    ],
+        CollectionResourceOperation
+    ]
     collectionOperations: [
-        ResourceOperation,
-    ],
+        CollectionResourceOperation
+    ]
     resources: [
-        SubResource,
-    ],
+        SubResource
+    ]
+    properties: {
+        value: String
+        other: String
+    }
 }
 
 resource SubResource {
     identifiers: {
-        id: String,
-    },
+        id: String
+    }
 }
 
-operation EmptyOperation {}
+@readonly
+operation CollectionResourceOperation {
+    input := {}
+    output := {}
+    errors: [
+        Error
+    ]
+}
+
+operation EmptyOperation {
+    input: Unit
+    output: Unit
+}
 
 operation MyOperation {
-    input: InputOutput,
-    output: InputOutput,
+    input := {}
+    output := {}
     errors: [
-        Error,
-    ],
+        Error
+    ]
 }
 
 @readonly
 operation ReadonlyResourceOperation {
-    input: ResourceOperationInput,
+    input := {
+        @required
+        id: String
+    }
+    output: Unit
 }
 
 @idempotent
 operation ResourceOperation {
-    input: ResourceOperationInput,
+    input := {
+        @required
+        id: String
+    }
+    output := {
+        value: String
+        other: String
+    }
 }
 
 @error("client")
 structure Error {}
-
-structure InputOutput {}
-
-structure ResourceOperationInput {
-    id: String,
-}

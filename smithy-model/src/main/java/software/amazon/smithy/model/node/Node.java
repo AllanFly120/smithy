@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.node;
 
 import static java.lang.String.format;
@@ -196,13 +185,24 @@ public abstract class Node implements FromSourceLocation, ToNode {
     }
 
     /**
+     * Create a Node from a potentially null {@link ToNode} value.
+     *
+     * @param value Value to create a node from.
+     * @return Returns the created Node.
+     */
+    public static Node from(ToNode value) {
+        return value == null ? Node.nullNode() : value.toNode();
+    }
+
+    /**
      * Creates an {@link ArrayNode} from a Collection of Node values.
      *
      * @param values String values to add to the ArrayNode.
      * @return Returns the created ArrayNode.
      */
-    public static ArrayNode fromNodes(List<Node> values) {
-        return new ArrayNode(values, SourceLocation.none());
+    @SuppressWarnings("unchecked")
+    public static ArrayNode fromNodes(List<? extends Node> values) {
+        return new ArrayNode((List<Node>) values, SourceLocation.none());
     }
 
     /**
@@ -241,7 +241,7 @@ public abstract class Node implements FromSourceLocation, ToNode {
      * @return Returns the ObjectNode builder.
      */
     public static ObjectNode.Builder objectNodeBuilder() {
-        return new ObjectNode.Builder();
+        return ObjectNode.builder();
     }
 
     /**
@@ -295,12 +295,8 @@ public abstract class Node implements FromSourceLocation, ToNode {
      * @throws SourceException on error.
      */
     public static List<String> loadArrayOfString(String descriptor, Node node) {
-        return node.expectArrayNode("Expected `" + descriptor + "` to be an array of strings. Found {type}.")
-                .getElements().stream()
-                .map(element -> element.expectStringNode(
-                        "Each element of `" + descriptor + "` must be a string. Found {type}."))
-                .map(StringNode::getValue)
-                .collect(Collectors.toList());
+        return node.expectArrayNode(() -> "Expected `" + descriptor + "` to be an array of strings. Found {type}.")
+                .getElementsAs(StringNode::getValue);
     }
 
     /**
@@ -718,7 +714,8 @@ public abstract class Node implements FromSourceLocation, ToNode {
 
             @Override
             public Node arrayNode(ArrayNode node) {
-                return node.getElements().stream()
+                return node.getElements()
+                        .stream()
                         .map(element -> sortNode(element, keyComparator))
                         .collect(ArrayNode.collect(node.getSourceLocation()));
             }

@@ -1,141 +1,101 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.cli;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import software.amazon.smithy.utils.SmithyUnstableApi;
 
 /**
- * Container for parsed command line arguments meant to be queried by Commands.
+ * Command line arguments list to evaluate.
  *
- * <p>Values parsed for command line arguments are canonicalized to the
- * long-form of an argument if available. This means that an argument
- * with a short name of "-h" and a long name of "--help" would be made
- * available in an {@code Arguments} instance as "--help" and not "-h".
+ * <p>Arguments are parsed on demand. To finalize parsing arguments and force validation of remaining arguments,
+ * call {@link #getPositional()}. Note that because arguments are parsed on demand and whole set of arguments isn't
+ * known before {@link #getPositional()} is called.
  */
-@SmithyUnstableApi
-public final class Arguments {
-    private final Map<String, List<String>> arguments;
-    private final List<String> positionalArguments;
+public interface Arguments {
 
-    public Arguments(Map<String, List<String>> arguments, List<String> positionalArguments) {
-        this.arguments = Collections.unmodifiableMap(arguments);
-        this.positionalArguments = Collections.unmodifiableList(positionalArguments);
+    static Arguments of(String[] args) {
+        return new DefaultArguments(args);
     }
 
     /**
-     * Checks if a canonicalized argument name was provided.
+     * Adds an argument receiver to the argument list.
      *
-     * <p>This method should be used for checking if a option is set rather
-     * than calling {@link #parameter} since that method throws when an
-     * argument cannot be found.
-     *
-     * @param arg Argument to check for (e.g., "--help").
-     * @return Returns true if the argument was set.
+     * @param receiver Receiver to add.
      */
-    public boolean has(String arg) {
-        return arguments.containsKey(arg);
-    }
+    void addReceiver(ArgumentReceiver receiver);
 
     /**
-     * Gets an argument by name or throws if not present.
+     * Check if this class contains a receiver.
      *
-     * <p>Returns the first value if the argument is repeated.
-     *
-     * @param arg Argument to get (e.g., "-h", "--help").
-     * @return Returns the value of the matching argument.
-     * @throws CliError if the argument cannot be found or if the arg is a option.
+     * @param receiverClass Class of receiver to detect.
+     * @return Returns true if found.
      */
-    public String parameter(String arg) {
-        return repeatedParameter(arg).get(0);
-    }
+    boolean hasReceiver(Class<? extends ArgumentReceiver> receiverClass);
 
     /**
-     * Gets an argument by name or return a default value if not found.
+     * Get a receiver by class.
      *
-     * @param arg Argument to get (e.g., "-h", "--help").
-     * @param defaultValue Default value to return if not found.
-     * @return Returns the value of the matching argument.
+     * @param type Type of receiver to get.
+     * @param <T> Type of receiver to get.
+     * @return Returns the found receiver.
+     * @throws NullPointerException if not found.
      */
-    public String parameter(String arg, String defaultValue) {
-        List<String> values = arguments.get(arg);
-        return values == null || values.isEmpty() ? defaultValue : values.get(0);
-    }
+    <T extends ArgumentReceiver> T getReceiver(Class<T> type);
 
     /**
-     * Gets a repeated argument by name or throws if not present.
+     * Get the argument receivers registered with the Arguments list.
      *
-     * @param arg Argument to retrieve (e.g., "--help").
-     * @return Returns a list of values for the argument.
-     * @throws CliError if the argument cannot be found or if the arg is a option.
+     * @return Returns the receivers.
      */
-    public List<String> repeatedParameter(String arg) {
-        if (arguments.containsKey(arg)) {
-            List<String> argVal = arguments.get(arg);
-            if (argVal == null || argVal.isEmpty()) {
-                throw new CliError("Argument " + arg + " was provided no value");
-            }
-            return argVal;
-        }
-
-        throw new CliError("Missing required argument: " + arg);
-    }
+    Iterable<ArgumentReceiver> getReceivers();
 
     /**
-     * Gets a repeated argument by name or returns a default list if not found.
+     * Checks if any arguments are remaining.
      *
-     * @param arg Argument to retrieve (e.g., "--help").
-     * @param defaultValues Default list of values to return if not found.
-     * @return Returns a list of values for the argument.
+     * @return Returns true if there are more arguments.
      */
-    public List<String> repeatedParameter(String arg, List<String> defaultValues) {
-        List<String> values = arguments.get(arg);
-        return values == null || values.isEmpty() ? defaultValues : values;
-    }
+    boolean hasNext();
 
     /**
-     * Gets the list of positional arguments that came after named arguments.
+     * Peeks at the next value in the argument list without shifting it.
      *
-     * @return Returns the trailing positional arguments.
+     * <p>Note that arguments consumed by a {@link ArgumentReceiver} are never peeked.
+     *
+     * @return Returns the next argument or null if no further arguments are present.
      */
-    public List<String> positionalArguments() {
-        return positionalArguments;
-    }
+    String peek();
 
-    @Override
-    public String toString() {
-        return "Arguments{" + "arguments=" + arguments + ", positionalArguments=" + positionalArguments + '}';
-    }
+    /**
+     * Shifts off the next value in the argument list or returns null.
+     *
+     * @return Returns the next value or null.
+     */
+    String shift();
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        } else if (!(o instanceof Arguments)) {
-            return false;
-        }
-        Arguments other = (Arguments) o;
-        return arguments.equals(other.arguments) && positionalArguments.equals(other.positionalArguments);
-    }
+    /**
+     * Expects an argument value for a parameter by name.
+     *
+     * @param parameter Name of the parameter to get the value of.
+     * @return Returns the value of the parameter.
+     * @throws CliError if the parameter is not present.
+     */
+    String shiftFor(String parameter);
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(arguments, positionalArguments);
-    }
+    /**
+     * Gets the positional arguments.
+     *
+     * <p>Expects that all remaining arguments are positional, and returns them.
+     *
+     * <p>If an argument is "--", then it's skipped and remaining arguments are considered positional. If any
+     * argument is encountered that isn't valid for a registered Receiver, then an error is raised. Otherwise, all
+     * remaining arguments are returned in a list.
+     *
+     * <p>Subscribers for different receivers are called when this method is first called.
+     *
+     * @return Returns remaining arguments.
+     * @throws CliError if the next argument starts with "--" but isn't "--".
+     */
+    List<String> getPositional();
 }

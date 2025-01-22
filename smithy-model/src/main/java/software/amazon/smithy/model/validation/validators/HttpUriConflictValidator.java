@@ -1,25 +1,14 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.validation.validators;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -35,7 +24,6 @@ import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
 import software.amazon.smithy.model.shapes.ShapeId;
-import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.EndpointTrait;
 import software.amazon.smithy.model.traits.HostLabelTrait;
 import software.amazon.smithy.model.traits.HttpTrait;
@@ -139,7 +127,12 @@ public final class HttpUriConflictValidator extends AbstractValidator {
         SmithyPattern prefix = operation.getTrait(EndpointTrait.class).get().getHostPrefix();
         SmithyPattern otherPrefix = otherOperation.getTrait(EndpointTrait.class).get().getHostPrefix();
         boolean allowable = !isAllowableConflict(
-                model, prefix, operation, otherPrefix, otherOperation, this::getHostLabelPatterns);
+                model,
+                prefix,
+                operation,
+                otherPrefix,
+                otherOperation,
+                this::getHostLabelPatterns);
         return allowable;
     }
 
@@ -147,7 +140,12 @@ public final class HttpUriConflictValidator extends AbstractValidator {
         UriPattern uriPattern = operation.getTrait(HttpTrait.class).get().getUri();
         UriPattern otherUriPattern = otherOperation.getTrait(HttpTrait.class).get().getUri();
         return isAllowableConflict(
-                model, uriPattern, operation, otherUriPattern, otherOperation, this::getHttpLabelPatterns);
+                model,
+                uriPattern,
+                operation,
+                otherUriPattern,
+                otherOperation,
+                this::getHttpLabelPatterns);
     }
 
     private boolean isAllowableConflict(
@@ -169,7 +167,8 @@ public final class HttpUriConflictValidator extends AbstractValidator {
         Map<String, Pattern> labelPatterns = getLabelPatterns.apply(model, operation);
         Map<String, Pattern> otherLabelPatterns = getLabelPatterns.apply(model, otherOperation);
 
-        return conflictingLabelSegments.entrySet().stream()
+        return conflictingLabelSegments.entrySet()
+                .stream()
                 // Only allow conflicts in cases where one of the segments is static and the other is a label.
                 .filter(conflict -> conflict.getKey().isLabel() != conflict.getValue().isLabel())
                 // Only allow the uris to conflict if every conflicting segment is allowable.
@@ -197,23 +196,25 @@ public final class HttpUriConflictValidator extends AbstractValidator {
 
     private Map<String, Pattern> getHttpLabelPatterns(Model model, OperationShape operation) {
         return HttpBindingIndex.of(model)
-                .getRequestBindings(operation).entrySet().stream()
+                .getRequestBindings(operation)
+                .entrySet()
+                .stream()
                 .filter(entry -> entry.getValue().getLocation().equals(HttpBinding.Location.LABEL))
                 .flatMap(entry -> OptionalUtils.stream(entry.getValue()
-                        .getMember().getMemberTrait(model, PatternTrait.class)
+                        .getMember()
+                        .getMemberTrait(model, PatternTrait.class)
                         .map(pattern -> Pair.of(entry.getKey(), pattern.getPattern()))))
                 .collect(Collectors.toMap(Pair::getLeft, Pair::getRight));
     }
 
     private Map<String, Pattern> getHostLabelPatterns(Model model, OperationShape operation) {
-        Optional<StructureShape> input = OperationIndex.of(model).getInput(operation);
-        return input.map(structureShape -> structureShape.members().stream()
-                .filter(member -> member.hasTrait(HostLabelTrait.class))
-                .filter(member -> member.hasTrait(PatternTrait.class))
-                .collect(Collectors.toMap(
-                        MemberShape::getMemberName,
-                        shape -> shape.expectTrait(PatternTrait.class).getPattern())))
-                .orElse(Collections.emptyMap());
+        Map<String, Pattern> result = new HashMap<>();
+        for (MemberShape member : OperationIndex.of(model).expectInputShape(operation).getAllMembers().values()) {
+            if (member.hasTrait(HostLabelTrait.class) && member.hasTrait(PatternTrait.class)) {
+                result.put(member.getMemberName(), member.expectTrait(PatternTrait.class).getPattern());
+            }
+        }
+        return result;
     }
 
     private String formatConflicts(UriPattern pattern, List<Pair<ShapeId, UriPattern>> conflicts) {
@@ -224,6 +225,7 @@ public final class HttpUriConflictValidator extends AbstractValidator {
 
         return String.format(
                 "Operation URI, `%s`, conflicts with other operation URIs in the same service: [%s]",
-                pattern, conflictString);
+                pattern,
+                conflictString);
     }
 }

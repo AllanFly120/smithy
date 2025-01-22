@@ -18,7 +18,7 @@
 //
 // See: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html#api-error-response
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.ec2
 
@@ -47,7 +47,7 @@ apply GreetingWithErrors @httpResponseTests([
         body: """
               <GreetingWithErrorsResponse xmlns="https://example.com/">
                   <greeting>Hello</greeting>
-                  <RequestId>requestid</RequestId>
+                  <requestId>requestid</requestId>
               </GreetingWithErrorsResponse>
               """,
         bodyMediaType: "application/xml",
@@ -84,7 +84,7 @@ apply InvalidGreeting @httpResponseTests([
                           <Message>Hi</Message>
                       </Error>
                   </Errors>
-                  <RequestId>foo-id</RequestId>
+                  <RequestID>foo-id</RequestID>
               </Response>
               """,
         bodyMediaType: "application/xml",
@@ -128,7 +128,7 @@ apply ComplexError @httpResponseTests([
                           </Nested>
                       </Error>
                   </Errors>
-                  <RequestId>foo-id</RequestId>
+                  <RequestID>foo-id</RequestID>
               </Response>
               """,
         bodyMediaType: "application/xml",

@@ -1,20 +1,23 @@
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson
 
 use aws.protocols#restJson1
 use smithy.test#httpMalformedRequestTests
 
+@suppress(["UnstableTrait"])
 @http(uri: "/MalformedTimestampHeaderDefault", method: "POST")
 operation MalformedTimestampHeaderDefault {
     input: MalformedTimestampHeaderDefaultInput
 }
 
+@suppress(["UnstableTrait"])
 @http(uri: "/MalformedTimestampHeaderDateTime", method: "POST")
 operation MalformedTimestampHeaderDateTime {
     input: MalformedTimestampHeaderDateTimeInput
 }
 
+@suppress(["UnstableTrait"])
 @http(uri: "/MalformedTimestampHeaderEpoch", method: "POST")
 operation MalformedTimestampHeaderEpoch {
     input: MalformedTimestampHeaderEpochInput
@@ -94,8 +97,7 @@ apply MalformedTimestampHeaderDateTime @httpMalformedRequestTests([
             }
         },
         testParameters: {
-            "value" : ["Tue, 29 Apr 2014 18:30:38 GMT",
-                       "Sun, 02 Jan 2000 20:34:56.000 GMT"]
+            "value" : ["Tue, 29 Apr 2014 18:30:38 GMT"]
         },
         tags : ["timestamp"]
     },
@@ -210,8 +212,7 @@ apply MalformedTimestampHeaderEpoch @httpMalformedRequestTests([
             }
         },
         testParameters: {
-            "value" : ["Tue, 29 Apr 2014 18:30:38 GMT",
-                       "Sun, 02 Jan 2000 20:34:56.000 GMT"]
+            "value" : ["Tue, 29 Apr 2014 18:30:38 GMT"]
         },
         tags : ["timestamp"]
     },

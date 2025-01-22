@@ -1,3 +1,5 @@
+$version: "2.0"
+
 namespace smithy.example
 
 use smithy.test#httpMalformedRequestTests
@@ -99,11 +101,32 @@ structure testProtocol {}
             "bar" : ["d", "e", "f"]
         }
     }
+    {
+        id: "noResponseBodyAssertionWithMediaType"
+        documentation: "Testing..."
+        protocol: testProtocol
+        request: {
+            body: "Zm9vCg=="
+            bodyMediaType: "application/cbor"
+            headers: {"X-Foo": "baz"}
+            host: "example.com"
+            method: "POST"
+            uri: "/"
+            queryParams: ["foo=baz"]
+        },
+        response: {
+            code: 400
+            headers: {"X-Foo": "baz"}
+        },
+        tags: ["foo", "bar"]
+    },
 ])
 operation SayHello {
-    input: SayHelloInput
+    input: SayHelloInput,
+    output: SayHelloOutput
 }
 
+@input
 structure SayHelloInput {
     @httpPayload
     body: String,
@@ -111,3 +134,6 @@ structure SayHelloInput {
     @httpHeader("X-OmitMe")
     header: String,
 }
+
+@output
+structure SayHelloOutput {}

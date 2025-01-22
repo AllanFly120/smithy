@@ -1,6 +1,6 @@
 // This file defines test cases that serialize lists in JSON documents.
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.restjson
 
@@ -8,9 +8,11 @@ use aws.protocols#restJson1
 use aws.protocoltests.shared#BooleanList
 use aws.protocoltests.shared#EpochSeconds
 use aws.protocoltests.shared#FooEnumList
+use aws.protocoltests.shared#IntegerEnumList
 use aws.protocoltests.shared#GreetingList
 use aws.protocoltests.shared#IntegerList
 use aws.protocoltests.shared#NestedStringList
+use aws.protocoltests.shared#SparseShortList
 use aws.protocoltests.shared#StringList
 use aws.protocoltests.shared#SparseStringList
 use aws.protocoltests.shared#StringSet
@@ -65,6 +67,10 @@ apply JsonLists @httpRequestTests([
                       "Foo",
                       "0"
                   ],
+                  "intEnumList": [
+                      1,
+                      2
+                  ],
                   "nestedStringList": [
                       [
                           "foo",
@@ -112,6 +118,10 @@ apply JsonLists @httpRequestTests([
             "enumList": [
                 "Foo",
                 "0"
+            ],
+            "intEnumList": [
+                1,
+                2
             ],
             "nestedStringList": [
                 [
@@ -150,25 +160,6 @@ apply JsonLists @httpRequestTests([
         params: {
             stringList: []
         }
-    },
-    {
-          id: "RestJsonListsSerializeNull",
-          documentation: "Serializes null values in lists",
-          protocol: restJson1,
-          method: "PUT",
-          uri: "/JsonLists",
-          body: """
-                {
-                    "sparseStringList": [
-                        null,
-                        "hi"
-                    ]
-                }""",
-          bodyMediaType: "application/json",
-          headers: {"Content-Type": "application/json"},
-          params: {
-              sparseStringList: [null, "hi"]
-          }
     }
 ])
 
@@ -203,6 +194,10 @@ apply JsonLists @httpResponseTests([
                   "enumList": [
                       "Foo",
                       "0"
+                  ],
+                  "intEnumList": [
+                      1,
+                      2
                   ],
                   "nestedStringList": [
                       [
@@ -252,6 +247,10 @@ apply JsonLists @httpResponseTests([
                 "Foo",
                 "0"
             ],
+            "intEnumList": [
+                1,
+                2
+            ],
             "nestedStringList": [
                 [
                     "foo",
@@ -288,31 +287,11 @@ apply JsonLists @httpResponseTests([
         params: {
             stringList: []
         }
-    },
-    {
-          id: "RestJsonListsSerializeNull",
-          documentation: "Serializes null values in sparse lists",
-          protocol: restJson1,
-          code: 200,
-          body: """
-                {
-                    "sparseStringList": [
-                        null,
-                        "hi"
-                    ]
-                }""",
-          bodyMediaType: "application/json",
-          headers: {"Content-Type": "application/json"},
-          params: {
-              sparseStringList: [null, "hi"]
-          }
     }
 ])
 
 structure JsonListsInputOutput {
     stringList: StringList,
-
-    sparseStringList: SparseStringList,
 
     stringSet: StringSet,
 
@@ -323,6 +302,8 @@ structure JsonListsInputOutput {
     timestampList: TimestampList,
 
     enumList: FooEnumList,
+
+    intEnumList: IntegerEnumList,
 
     nestedStringList: NestedStringList,
 
@@ -340,4 +321,67 @@ structure StructureListMember {
 
     @jsonName("other")
     b: String,
+}
+
+@httpRequestTests([
+    {
+        id: "RestJsonSparseListsSerializeNull"
+        documentation: "Serializes null values in sparse lists"
+        protocol: restJson1
+        method: "PUT"
+        uri: "/SparseJsonLists"
+        body: """
+                {
+                    "sparseStringList": [
+                        null,
+                        "hi"
+                    ],
+                    "sparseShortList": [
+                        null,
+                        2
+                    ]
+                }"""
+        bodyMediaType: "application/json"
+        headers: {"Content-Type": "application/json"}
+        params: {
+            sparseStringList: [null, "hi"],
+            sparseShortList: [null, 2]
+        }
+    }
+])
+@httpResponseTests([
+    {
+        id: "RestJsonSparseListsSerializeNull"
+        documentation: "Serializes null values in sparse lists"
+        protocol: restJson1
+        code: 200
+        body: """
+                {
+                    "sparseStringList": [
+                        null,
+                        "hi"
+                    ],
+                    "sparseShortList": [
+                        null,
+                        2
+                    ]
+                }"""
+        bodyMediaType: "application/json"
+        headers: {"Content-Type": "application/json"}
+        params: {
+            sparseStringList: [null, "hi"],
+            sparseShortList: [null, 2]
+        }
+    }
+])
+@idempotent
+@http(uri: "/SparseJsonLists", method: "PUT")
+operation SparseJsonLists {
+    input: SparseJsonListsInputOutput
+    output: SparseJsonListsInputOutput
+}
+
+structure SparseJsonListsInputOutput {
+    sparseStringList: SparseStringList
+    sparseShortList: SparseShortList
 }

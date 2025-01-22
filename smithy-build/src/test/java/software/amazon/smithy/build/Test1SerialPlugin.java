@@ -1,6 +1,8 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package software.amazon.smithy.build;
-
-import java.util.concurrent.TimeUnit;
 
 public class Test1SerialPlugin implements SmithyBuildPlugin {
     @Override
@@ -15,12 +17,10 @@ public class Test1SerialPlugin implements SmithyBuildPlugin {
 
     @Override
     public void execute(PluginContext context) {
-        try {
-            TimeUnit.SECONDS.sleep(1);
-            context.getFileManifest().writeFile("hello1Serial", String.format("%s", System.currentTimeMillis()));
-            TimeUnit.SECONDS.sleep(1);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        int accum = 0;
+        for (int i = 0; i < 100000; i++) {
+            accum++;
         }
+        context.getFileManifest().writeFile("hello1Serial", String.format("%s", System.nanoTime() + accum));
     }
 }

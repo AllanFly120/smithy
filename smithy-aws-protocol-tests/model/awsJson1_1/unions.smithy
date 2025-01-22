@@ -1,6 +1,6 @@
 // This file defines test cases that serialize unions.
 
-$version: "1.0"
+$version: "2.0"
 
 namespace aws.protocoltests.json
 
@@ -440,4 +440,31 @@ apply JsonUnions @httpResponseTests([
             }
         }
     },
+    {
+        id: "AwsJson11DeserializeIgnoreType"
+        appliesTo: "client"
+        documentation: "Ignores an unrecognized __type property"
+        protocol: awsJson1_1
+        code: 200
+        body: """
+            {
+                "contents": {
+                    "__type": "aws.protocoltests.json10#MyUnion",
+                    "structureValue": {
+                        "hi": "hello"
+                    }
+                }
+            }"""
+        bodyMediaType: "application/json"
+        headers: {
+            "Content-Type": "application/x-amz-json-1.1"
+        }
+        params: {
+            contents: {
+                structureValue: {
+                    hi: "hello"
+                }
+            }
+        }
+    }
 ])

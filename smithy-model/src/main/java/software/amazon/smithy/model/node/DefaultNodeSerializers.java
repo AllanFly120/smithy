@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.node;
 
 import static software.amazon.smithy.model.node.NodeMapper.Serializer;
@@ -33,8 +22,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import software.amazon.smithy.model.FromSourceLocation;
@@ -201,7 +188,7 @@ final class DefaultNodeSerializers {
                 } else {
                     throw new NodeSerializationException(
                             "Unable to write Map key because it was not serialized as a string: "
-                            + entry.getKey() + " -> " + Node.printJson(key));
+                                    + entry.getKey() + " -> " + Node.printJson(key));
                 }
             }
 
@@ -252,13 +239,13 @@ final class DefaultNodeSerializers {
      */
     private static final class ClassInfo {
         // Cache previously evaluated objects.
-        private static final ConcurrentMap<Class, ClassInfo> CACHE = new ConcurrentHashMap<>();
+        private static final IdentityClassCache<Class, ClassInfo> CACHE = new IdentityClassCache<>();
 
         // Methods aren't returned normally in any particular order, so give them an order.
         final Map<String, Method> getters = new TreeMap<>();
 
-        static ClassInfo fromClass(Class<?> type) {
-            return CACHE.computeIfAbsent(type, klass -> {
+        static ClassInfo fromClass(Class<?> klass) {
+            return CACHE.getForClass(klass, klass, () -> {
                 ClassInfo info = new ClassInfo();
                 Set<String> transientFields = getTransientFields(klass);
                 // Determine which methods are getters that aren't backed by transient properties.
@@ -382,6 +369,8 @@ final class DefaultNodeSerializers {
                     return false;
                 } else if (value.isArrayNode() && value.expectArrayNode().isEmpty()) {
                     return false;
+                } else if (value.isBooleanNode() && !value.expectBooleanNode().getValue()) {
+                    return false;
                 }
             }
 
@@ -416,8 +405,7 @@ final class DefaultNodeSerializers {
             PATH_SERIALIZER,
             FILE_SERIALIZER,
             // Lots of things implement iterable that have specialized serialization.
-            ITERABLE_SERIALIZER
-    );
+            ITERABLE_SERIALIZER);
 
     private DefaultNodeSerializers() {}
 }

@@ -1,18 +1,7 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.selector;
 
 import java.util.ArrayList;
@@ -313,7 +302,7 @@ final class AttributeValueImpl {
             } else if (key.equals("id")) {
                 return AttributeValue.id(service.getId());
             } else {
-                return EMPTY;
+                throw new SelectorException("Invalid nested 'service' selector attribute property: " + key);
             }
         }
     }
@@ -357,7 +346,7 @@ final class AttributeValueImpl {
                     // Length returns the length of the shape ID.
                     return AttributeValue.literal(id.toString().length());
                 default:
-                    return EMPTY;
+                    throw new SelectorException("Invalid nested 'id' selector attribute property: " + property);
             }
         }
     }
@@ -445,8 +434,7 @@ final class AttributeValueImpl {
                 case "var":
                     return new VariableValue(vars);
                 default:
-                    LOGGER.warning("Unsupported shape selector attribute: " + property);
-                    return EMPTY;
+                    throw new SelectorException("Invalid shape selector attribute: " + property);
             }
         }
     }

@@ -1,28 +1,15 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.traits;
 
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import software.amazon.smithy.model.FromSourceLocation;
 import software.amazon.smithy.model.SourceLocation;
 import software.amazon.smithy.model.node.ArrayNode;
 import software.amazon.smithy.model.node.Node;
-import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.utils.ListUtils;
 import software.amazon.smithy.utils.SetUtils;
@@ -78,17 +65,19 @@ public final class AuthTrait extends AbstractTrait {
 
         @Override
         public Trait createTrait(ShapeId target, Node value) {
-            Set<ShapeId> values = new LinkedHashSet<>();
-            for (StringNode node : value.expectArrayNode().getElementsAs(StringNode.class)) {
-                values.add(node.expectShapeId());
-            }
-            return new AuthTrait(values, value.getSourceLocation());
+            ArrayNode arrayNode = value.expectArrayNode();
+            List<ShapeId> values = arrayNode.getElementsAs(ShapeId::fromNode);
+            AuthTrait trait = new AuthTrait(values, value.getSourceLocation());
+            trait.setNodeCache(value);
+            return trait;
         }
     }
 
     @Override
     protected Node createNode() {
-        return getValueSet().stream().map(ShapeId::toString).map(Node::from)
+        return getValueSet().stream()
+                .map(ShapeId::toString)
+                .map(Node::from)
                 .collect(ArrayNode.collect(getSourceLocation()));
     }
 }

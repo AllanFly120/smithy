@@ -1,22 +1,12 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.shapes;
 
 import java.util.Optional;
 import software.amazon.smithy.model.Model;
+import software.amazon.smithy.model.traits.DefaultTrait;
 import software.amazon.smithy.model.traits.Trait;
 import software.amazon.smithy.utils.OptionalUtils;
 import software.amazon.smithy.utils.SmithyBuilder;
@@ -42,7 +32,7 @@ public final class MemberShape extends Shape implements ToSmithyBuilder<MemberSh
 
     @Override
     public Builder toBuilder() {
-        return builder().from(this).target(target);
+        return updateBuilder(builder()).target(target);
     }
 
     /**
@@ -55,13 +45,18 @@ public final class MemberShape extends Shape implements ToSmithyBuilder<MemberSh
     }
 
     @Override
-    public <R> R accept(ShapeVisitor<R> cases) {
-        return cases.memberShape(this);
+    public <R> R accept(ShapeVisitor<R> visitor) {
+        return visitor.memberShape(this);
     }
 
     @Override
     public Optional<MemberShape> asMemberShape() {
         return Optional.of(this);
+    }
+
+    @Override
+    public ShapeType getType() {
+        return ShapeType.MEMBER;
     }
 
     /**
@@ -96,6 +91,22 @@ public final class MemberShape extends Shape implements ToSmithyBuilder<MemberSh
         return !isRequired();
     }
 
+    /**
+     * @return Returns true if the member has a default set explicitly to null.
+     */
+    public boolean hasNullDefault() {
+        DefaultTrait defaultTrait = getTrait(DefaultTrait.class).orElse(null);
+        return defaultTrait != null && defaultTrait.toNode().isNullNode();
+    }
+
+    /**
+     * @return Returns true if the member has a default not set to null.
+     */
+    public boolean hasNonNullDefault() {
+        DefaultTrait defaultTrait = getTrait(DefaultTrait.class).orElse(null);
+        return defaultTrait != null && !defaultTrait.toNode().isNullNode();
+    }
+
     @Override
     public boolean equals(Object other) {
         return super.equals(other) && getTarget().equals(((MemberShape) other).getTarget());
@@ -105,16 +116,14 @@ public final class MemberShape extends Shape implements ToSmithyBuilder<MemberSh
     public <T extends Trait> Optional<T> getMemberTrait(Model model, Class<T> trait) {
         return OptionalUtils.or(
                 getTrait(trait),
-                () -> model.getShape(getTarget()).flatMap(targetedShape -> targetedShape.getTrait(trait))
-        );
+                () -> model.getShape(getTarget()).flatMap(targetedShape -> targetedShape.getTrait(trait)));
     }
 
     @Override
     public Optional<Trait> findMemberTrait(Model model, String traitName) {
         return OptionalUtils.or(
                 findTrait(traitName),
-                () -> model.getShape(getTarget()).flatMap(targetedShape -> targetedShape.findTrait(traitName))
-        );
+                () -> model.getShape(getTarget()).flatMap(targetedShape -> targetedShape.findTrait(traitName)));
     }
 
     /**
@@ -154,6 +163,13 @@ public final class MemberShape extends Shape implements ToSmithyBuilder<MemberSh
          */
         public Builder target(String shapeId) {
             return target(ShapeId.from(shapeId));
+        }
+
+        /**
+         * @return Returns the target currently set on the member.
+         */
+        public ShapeId getTarget() {
+            return target;
         }
     }
 }

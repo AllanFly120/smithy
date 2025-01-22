@@ -1,21 +1,11 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.validation;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -39,9 +29,14 @@ public final class ValidatedResult<T> {
      * @param result Value to set.
      * @param events Events to set.
      */
-    public ValidatedResult(T result, Collection<ValidationEvent> events) {
+    public ValidatedResult(T result, List<ValidationEvent> events) {
         this.result = result;
-        this.events = ListUtils.copyOf(events);
+        this.events = Collections.unmodifiableList(events);
+    }
+
+    @Deprecated
+    public ValidatedResult(T result, Collection<ValidationEvent> events) {
+        this(result, ListUtils.copyOf(events));
     }
 
     /**
@@ -52,8 +47,13 @@ public final class ValidatedResult<T> {
      * @param <T> The type of value in the result.
      * @return Returns the created ValidatedResult.
      */
-    public static <T> ValidatedResult<T> fromErrors(Collection<ValidationEvent> events) {
+    public static <T> ValidatedResult<T> fromErrors(List<ValidationEvent> events) {
         return new ValidatedResult<>(null, events);
+    }
+
+    @Deprecated
+    public static <T> ValidatedResult<T> fromErrors(Collection<ValidationEvent> events) {
+        return fromErrors(ListUtils.copyOf(events));
     }
 
     /**
@@ -110,11 +110,11 @@ public final class ValidatedResult<T> {
     }
 
     /**
-     * Get the result, but throw if there are any ERROR events or if the
+     * Get the result, but throw if there are any ERROR or DANGER events or if the
      * result is empty.
      *
      * @return Returns the result.
-     * @throws ValidatedResultException if there are any ERROR events.
+     * @throws ValidatedResultException if there are any ERROR or DANGER events.
      * @throws IllegalStateException if there is no result.
      */
     public T unwrap() {
@@ -141,6 +141,11 @@ public final class ValidatedResult<T> {
      * @return Returns true if there are errors or unsuppressed dangers.
      */
     public boolean isBroken() {
-        return !getValidationEvents(Severity.ERROR).isEmpty() || !getValidationEvents(Severity.DANGER).isEmpty();
+        for (ValidationEvent event : events) {
+            if (event.getSeverity() == Severity.ERROR || event.getSeverity() == Severity.DANGER) {
+                return true;
+            }
+        }
+        return false;
     }
 }

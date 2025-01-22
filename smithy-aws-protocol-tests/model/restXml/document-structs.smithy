@@ -1,15 +1,24 @@
 // This file defines test cases that serialize synthesized XML documents
 // in the payload of HTTP requests and responses.
 
-$version: "1.0"
+$version: "2.0"
+$operationInputSuffix: "Request"
+$operationOutputSuffix: "Response"
 
 namespace aws.protocoltests.restxml
 
 use aws.protocols#restXml
+use aws.protocoltests.shared#DateTime
+use aws.protocoltests.shared#EpochSeconds
 use aws.protocoltests.shared#FooEnum
 use aws.protocoltests.shared#FooEnumList
 use aws.protocoltests.shared#FooEnumSet
 use aws.protocoltests.shared#FooEnumMap
+use aws.protocoltests.shared#IntegerEnum
+use aws.protocoltests.shared#IntegerEnumList
+use aws.protocoltests.shared#IntegerEnumSet
+use aws.protocoltests.shared#IntegerEnumMap
+use aws.protocoltests.shared#HttpDate
 use smithy.test#httpRequestTests
 use smithy.test#httpResponseTests
 
@@ -18,8 +27,8 @@ use smithy.test#httpResponseTests
 @idempotent
 @http(uri: "/SimpleScalarProperties", method: "PUT")
 operation SimpleScalarProperties {
-    input: SimpleScalarPropertiesInputOutput,
-    output: SimpleScalarPropertiesInputOutput
+    input := with [SimpleScalarPropertiesInputOutput] {}
+    output := with [SimpleScalarPropertiesInputOutput] {}
 }
 
 apply SimpleScalarProperties @httpRequestTests([
@@ -30,7 +39,7 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <stringValue>string</stringValue>
                   <trueBooleanValue>true</trueBooleanValue>
                   <falseBooleanValue>false</falseBooleanValue>
@@ -40,7 +49,7 @@ apply SimpleScalarProperties @httpRequestTests([
                   <longValue>4</longValue>
                   <floatValue>5.5</floatValue>
                   <DoubleDribble>6.5</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -67,9 +76,9 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <stringValue>&lt;string&gt;</stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -88,9 +97,9 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <stringValue>  string with white    space  </stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -109,9 +118,9 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <stringValue>   </stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -130,10 +139,10 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <floatValue>NaN</floatValue>
                   <DoubleDribble>NaN</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -151,10 +160,10 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <floatValue>Infinity</floatValue>
                   <DoubleDribble>Infinity</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -172,10 +181,10 @@ apply SimpleScalarProperties @httpRequestTests([
         method: "PUT",
         uri: "/SimpleScalarProperties",
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesRequest>
                   <floatValue>-Infinity</floatValue>
                   <DoubleDribble>-Infinity</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -195,7 +204,7 @@ apply SimpleScalarProperties @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <stringValue>string</stringValue>
                   <trueBooleanValue>true</trueBooleanValue>
                   <falseBooleanValue>false</falseBooleanValue>
@@ -205,7 +214,7 @@ apply SimpleScalarProperties @httpResponseTests([
                   <longValue>4</longValue>
                   <floatValue>5.5</floatValue>
                   <DoubleDribble>6.5</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -238,9 +247,9 @@ apply SimpleScalarProperties @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <stringValue>escaped data: &amp;lt;&#xD;&#10;</stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -259,9 +268,9 @@ apply SimpleScalarProperties @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <stringValue>&lt;string&gt;</stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -280,11 +289,11 @@ apply SimpleScalarProperties @httpResponseTests([
         code: 200,
         body: """
               <?xml version = "1.0" encoding = "UTF-8"?>
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <![CDATA[characters representing CDATA]]>
                   <stringValue>string</stringValue>
                   <!--xml comment-->
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -303,9 +312,9 @@ apply SimpleScalarProperties @httpResponseTests([
         code: 200,
         body: """
               <?xml version = "1.0" encoding = "UTF-8"?>
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <stringValue> string with white    space </stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -324,9 +333,9 @@ apply SimpleScalarProperties @httpResponseTests([
         code: 200,
         body: """
               <?xml version = "1.0" encoding = "UTF-8"?>
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <stringValue>  </stringValue>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -344,10 +353,10 @@ apply SimpleScalarProperties @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <floatValue>NaN</floatValue>
                   <DoubleDribble>NaN</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -364,10 +373,10 @@ apply SimpleScalarProperties @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <floatValue>Infinity</floatValue>
                   <DoubleDribble>Infinity</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -384,10 +393,10 @@ apply SimpleScalarProperties @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <SimpleScalarPropertiesInputOutput>
+              <SimpleScalarPropertiesResponse>
                   <floatValue>-Infinity</floatValue>
                   <DoubleDribble>-Infinity</DoubleDribble>
-              </SimpleScalarPropertiesInputOutput>
+              </SimpleScalarPropertiesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -400,6 +409,7 @@ apply SimpleScalarProperties @httpResponseTests([
     },
 ])
 
+@mixin
 structure SimpleScalarPropertiesInputOutput {
     @httpHeader("X-Foo")
     foo: String,
@@ -422,8 +432,12 @@ structure SimpleScalarPropertiesInputOutput {
 @http(uri: "/XmlEmptyStrings", method: "PUT")
 @tags(["client-only"])
 operation XmlEmptyStrings {
-    input: XmlEmptyStringsInputOutput,
-    output: XmlEmptyStringsInputOutput
+    input := {
+        emptyString: String
+    }
+    output := {
+        emptyString: String
+    }
 }
 
 apply XmlEmptyStrings @httpRequestTests([
@@ -434,9 +448,9 @@ apply XmlEmptyStrings @httpRequestTests([
            method: "PUT",
            uri: "/XmlEmptyStrings",
            body: """
-                 <XmlEmptyStringsInputOutput>
+                 <XmlEmptyStringsRequest>
                      <emptyString></emptyString>
-                 </XmlEmptyStringsInputOutput>
+                 </XmlEmptyStringsRequest>
                  """,
            bodyMediaType: "application/xml",
            headers: {
@@ -456,9 +470,9 @@ apply XmlEmptyStrings @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlEmptyStringsInputOutput>
+              <XmlEmptyStringsResponse>
                   <emptyString></emptyString>
-              </XmlEmptyStringsInputOutput>
+              </XmlEmptyStringsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -475,9 +489,9 @@ apply XmlEmptyStrings @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlEmptyStringsInputOutput>
+              <XmlEmptyStringsResponse>
                   <emptyString/>
-              </XmlEmptyStringsInputOutput>
+              </XmlEmptyStringsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -490,15 +504,15 @@ apply XmlEmptyStrings @httpResponseTests([
     }
 ])
 
-structure XmlEmptyStringsInputOutput {
-    emptyString: String
-}
-
 /// Blobs are base64 encoded
 @http(uri: "/XmlBlobs", method: "POST")
 operation XmlBlobs {
-    input: XmlBlobsInputOutput,
-    output: XmlBlobsInputOutput
+    input := {
+        data: Blob
+    }
+    output := {
+        data: Blob
+    }
 }
 
 apply XmlBlobs @httpRequestTests([
@@ -509,9 +523,9 @@ apply XmlBlobs @httpRequestTests([
         method: "POST",
         uri: "/XmlBlobs",
         body: """
-              <XmlBlobsInputOutput>
+              <XmlBlobsRequest>
                   <data>dmFsdWU=</data>
-              </XmlBlobsInputOutput>
+              </XmlBlobsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -530,9 +544,9 @@ apply XmlBlobs @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlBlobsInputOutput>
+              <XmlBlobsResponse>
                   <data>dmFsdWU=</data>
-              </XmlBlobsInputOutput>
+              </XmlBlobsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -548,8 +562,12 @@ apply XmlBlobs @httpResponseTests([
 @http(uri: "/XmlEmptyBlobs", method: "POST")
 @tags(["client-only"])
 operation XmlEmptyBlobs {
-    input: XmlBlobsInputOutput,
-    output: XmlBlobsInputOutput
+    input := {
+        data: Blob
+    }
+    output := {
+        data: Blob
+    }
 }
 
 apply XmlEmptyBlobs @httpResponseTests([
@@ -559,9 +577,9 @@ apply XmlEmptyBlobs @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlBlobsInputOutput>
+              <XmlEmptyBlobsResponse>
                   <data></data>
-              </XmlBlobsInputOutput>
+              </XmlEmptyBlobsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -578,9 +596,9 @@ apply XmlEmptyBlobs @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlBlobsInputOutput>
+              <XmlEmptyBlobsResponse>
                   <data/>
-              </XmlBlobsInputOutput>
+              </XmlEmptyBlobsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -593,17 +611,13 @@ apply XmlEmptyBlobs @httpResponseTests([
     }
 ])
 
-structure XmlBlobsInputOutput {
-    data: Blob
-}
-
 /// This tests how timestamps are serialized, including using the
 /// default format of date-time and various @timestampFormat trait
 /// values.
 @http(uri: "/XmlTimestamps", method: "POST")
 operation XmlTimestamps {
-    input: XmlTimestampsInputOutput,
-    output: XmlTimestampsInputOutput
+    input := with [XmlTimestampsInputOutput] {}
+    output := with [XmlTimestampsInputOutput] {}
 }
 
 apply XmlTimestamps @httpRequestTests([
@@ -614,9 +628,9 @@ apply XmlTimestamps @httpRequestTests([
         method: "POST",
         uri: "/XmlTimestamps",
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsRequest>
                   <normal>2014-04-29T18:30:38Z</normal>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -633,9 +647,9 @@ apply XmlTimestamps @httpRequestTests([
         method: "POST",
         uri: "/XmlTimestamps",
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsRequest>
                   <dateTime>2014-04-29T18:30:38Z</dateTime>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -646,15 +660,34 @@ apply XmlTimestamps @httpRequestTests([
         }
     },
     {
+        id: "XmlTimestampsWithDateTimeOnTargetFormat",
+        documentation: "Ensures that the timestampFormat of date-time on the target shape works like normal timestamps",
+        protocol: restXml,
+        method: "POST",
+        uri: "/XmlTimestamps",
+        body: """
+              <XmlTimestampsRequest>
+                  <dateTimeOnTarget>2014-04-29T18:30:38Z</dateTimeOnTarget>
+              </XmlTimestampsRequest>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            dateTimeOnTarget: 1398796238
+        }
+    },
+    {
         id: "XmlTimestampsWithEpochSecondsFormat",
         documentation: "Ensures that the timestampFormat of epoch-seconds works",
         protocol: restXml,
         method: "POST",
         uri: "/XmlTimestamps",
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsRequest>
                   <epochSeconds>1398796238</epochSeconds>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -665,15 +698,34 @@ apply XmlTimestamps @httpRequestTests([
         }
     },
     {
+        id: "XmlTimestampsWithEpochSecondsOnTargetFormat",
+        documentation: "Ensures that the timestampFormat of epoch-seconds on the target shape works",
+        protocol: restXml,
+        method: "POST",
+        uri: "/XmlTimestamps",
+        body: """
+              <XmlTimestampsRequest>
+                  <epochSecondsOnTarget>1398796238</epochSecondsOnTarget>
+              </XmlTimestampsRequest>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            epochSecondsOnTarget: 1398796238
+        }
+    },
+    {
         id: "XmlTimestampsWithHttpDateFormat",
         documentation: "Ensures that the timestampFormat of http-date works",
         protocol: restXml,
         method: "POST",
         uri: "/XmlTimestamps",
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsRequest>
                   <httpDate>Tue, 29 Apr 2014 18:30:38 GMT</httpDate>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -681,6 +733,25 @@ apply XmlTimestamps @httpRequestTests([
         },
         params: {
             httpDate: 1398796238
+        }
+    },
+    {
+        id: "XmlTimestampsWithHttpDateOnTargetFormat",
+        documentation: "Ensures that the timestampFormat of http-date on the target shape works",
+        protocol: restXml,
+        method: "POST",
+        uri: "/XmlTimestamps",
+        body: """
+              <XmlTimestampsRequest>
+                  <httpDateOnTarget>Tue, 29 Apr 2014 18:30:38 GMT</httpDateOnTarget>
+              </XmlTimestampsRequest>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            httpDateOnTarget: 1398796238
         }
     },
 ])
@@ -692,9 +763,9 @@ apply XmlTimestamps @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsResponse>
                   <normal>2014-04-29T18:30:38Z</normal>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -710,9 +781,9 @@ apply XmlTimestamps @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsResponse>
                   <dateTime>2014-04-29T18:30:38Z</dateTime>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -723,14 +794,32 @@ apply XmlTimestamps @httpResponseTests([
         }
     },
     {
+        id: "XmlTimestampsWithDateTimeOnTargetFormat",
+        documentation: "Ensures that the timestampFormat of date-time on the target shape works like normal timestamps",
+        protocol: restXml,
+        code: 200,
+        body: """
+              <XmlTimestampsResponse>
+                  <dateTimeOnTarget>2014-04-29T18:30:38Z</dateTimeOnTarget>
+              </XmlTimestampsResponse>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            dateTimeOnTarget: 1398796238
+        }
+    },
+    {
         id: "XmlTimestampsWithEpochSecondsFormat",
         documentation: "Ensures that the timestampFormat of epoch-seconds works",
         protocol: restXml,
         code: 200,
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsResponse>
                   <epochSeconds>1398796238</epochSeconds>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -741,14 +830,32 @@ apply XmlTimestamps @httpResponseTests([
         }
     },
     {
+        id: "XmlTimestampsWithEpochSecondsOnTargetFormat",
+        documentation: "Ensures that the timestampFormat of epoch-seconds on the target shape works",
+        protocol: restXml,
+        code: 200,
+        body: """
+              <XmlTimestampsResponse>
+                  <epochSecondsOnTarget>1398796238</epochSecondsOnTarget>
+              </XmlTimestampsResponse>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            epochSecondsOnTarget: 1398796238
+        }
+    },
+    {
         id: "XmlTimestampsWithHttpDateFormat",
         documentation: "Ensures that the timestampFormat of http-date works",
         protocol: restXml,
         code: 200,
         body: """
-              <XmlTimestampsInputOutput>
+              <XmlTimestampsResponse>
                   <httpDate>Tue, 29 Apr 2014 18:30:38 GMT</httpDate>
-              </XmlTimestampsInputOutput>
+              </XmlTimestampsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -758,27 +865,52 @@ apply XmlTimestamps @httpResponseTests([
             httpDate: 1398796238
         }
     },
+    {
+        id: "XmlTimestampsWithHttpDateOnTargetFormat",
+        documentation: "Ensures that the timestampFormat of http-date on the target shape works",
+        protocol: restXml,
+        code: 200,
+        body: """
+              <XmlTimestampsResponse>
+                  <httpDateOnTarget>Tue, 29 Apr 2014 18:30:38 GMT</httpDateOnTarget>
+              </XmlTimestampsResponse>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            httpDateOnTarget: 1398796238
+        }
+    },
 ])
 
+@mixin
 structure XmlTimestampsInputOutput {
     normal: Timestamp,
 
     @timestampFormat("date-time")
     dateTime: Timestamp,
 
+    dateTimeOnTarget: DateTime,
+
     @timestampFormat("epoch-seconds")
     epochSeconds: Timestamp,
 
+    epochSecondsOnTarget: EpochSeconds,
+
     @timestampFormat("http-date")
     httpDate: Timestamp,
+
+    httpDateOnTarget: HttpDate,
 }
 
 /// This example serializes enums as top level properties, in lists, sets, and maps.
 @idempotent
 @http(uri: "/XmlEnums", method: "PUT")
 operation XmlEnums {
-    input: XmlEnumsInputOutput,
-    output: XmlEnumsInputOutput
+    input := with [XmlEnumsInputOutput] {}
+    output := with [XmlEnumsInputOutput] {}
 }
 
 apply XmlEnums @httpRequestTests([
@@ -789,7 +921,7 @@ apply XmlEnums @httpRequestTests([
         method: "PUT",
         uri: "/XmlEnums",
         body: """
-              <XmlEnumsInputOutput>
+              <XmlEnumsRequest>
                   <fooEnum1>Foo</fooEnum1>
                   <fooEnum2>0</fooEnum2>
                   <fooEnum3>1</fooEnum3>
@@ -811,7 +943,7 @@ apply XmlEnums @httpRequestTests([
                           <value>0</value>
                       </entry>
                   </fooEnumMap>
-              </XmlEnumsInputOutput>
+              </XmlEnumsRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -838,7 +970,7 @@ apply XmlEnums @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlEnumsInputOutput>
+              <XmlEnumsResponse>
                   <fooEnum1>Foo</fooEnum1>
                   <fooEnum2>0</fooEnum2>
                   <fooEnum3>1</fooEnum3>
@@ -860,7 +992,7 @@ apply XmlEnums @httpResponseTests([
                           <value>0</value>
                       </entry>
                   </fooEnumMap>
-              </XmlEnumsInputOutput>
+              </XmlEnumsResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -880,6 +1012,7 @@ apply XmlEnums @httpResponseTests([
     }
 ])
 
+@mixin
 structure XmlEnumsInputOutput {
     fooEnum1: FooEnum,
     fooEnum2: FooEnum,
@@ -889,12 +1022,133 @@ structure XmlEnumsInputOutput {
     fooEnumMap: FooEnumMap,
 }
 
+/// This example serializes enums as top level properties, in lists, sets, and maps.
+@idempotent
+@http(uri: "/XmlIntEnums", method: "PUT")
+operation XmlIntEnums {
+    input := with [XmlIntEnumsInputOutput] {}
+    output := with [XmlIntEnumsInputOutput] {}
+}
+
+apply XmlIntEnums @httpRequestTests([
+    {
+        id: "XmlIntEnums",
+        documentation: "Serializes simple scalar properties",
+        protocol: restXml,
+        method: "PUT",
+        uri: "/XmlIntEnums",
+        body: """
+              <XmlIntEnumsRequest>
+                  <intEnum1>1</intEnum1>
+                  <intEnum2>2</intEnum2>
+                  <intEnum3>3</intEnum3>
+                  <intEnumList>
+                      <member>1</member>
+                      <member>2</member>
+                  </intEnumList>
+                  <intEnumSet>
+                      <member>1</member>
+                      <member>2</member>
+                  </intEnumSet>
+                  <intEnumMap>
+                      <entry>
+                          <key>a</key>
+                          <value>1</value>
+                      </entry>
+                      <entry>
+                          <key>b</key>
+                          <value>2</value>
+                      </entry>
+                  </intEnumMap>
+              </XmlIntEnumsRequest>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            intEnum1: 1,
+            intEnum2: 2,
+            intEnum3: 3,
+            intEnumList: [1, 2],
+            intEnumSet: [1, 2],
+            intEnumMap: {
+                "a": 1,
+                "b": 2
+            }
+        }
+    }
+])
+
+apply XmlIntEnums @httpResponseTests([
+    {
+        id: "XmlIntEnums",
+        documentation: "Serializes simple scalar properties",
+        protocol: restXml,
+        code: 200,
+        body: """
+              <XmlIntEnumsResponse>
+                  <intEnum1>1</intEnum1>
+                  <intEnum2>2</intEnum2>
+                  <intEnum3>3</intEnum3>
+                  <intEnumList>
+                      <member>1</member>
+                      <member>2</member>
+                  </intEnumList>
+                  <intEnumSet>
+                      <member>1</member>
+                      <member>2</member>
+                  </intEnumSet>
+                  <intEnumMap>
+                      <entry>
+                          <key>a</key>
+                          <value>1</value>
+                      </entry>
+                      <entry>
+                          <key>b</key>
+                          <value>2</value>
+                      </entry>
+                  </intEnumMap>
+              </XmlIntEnumsResponse>
+              """,
+        bodyMediaType: "application/xml",
+        headers: {
+            "Content-Type": "application/xml"
+        },
+        params: {
+            intEnum1: 1,
+            intEnum2: 2,
+            intEnum3: 3,
+            intEnumList: [1, 2],
+            intEnumSet: [1, 2],
+            intEnumMap: {
+                "a": 1,
+                "b": 2
+            }
+        }
+    }
+])
+
+@mixin
+structure XmlIntEnumsInputOutput {
+    intEnum1: IntegerEnum,
+    intEnum2: IntegerEnum,
+    intEnum3: IntegerEnum,
+    intEnumList: IntegerEnumList,
+    intEnumSet: IntegerEnumSet,
+    intEnumMap: IntegerEnumMap,
+}
+
 /// Recursive shapes
 @idempotent
 @http(uri: "/RecursiveShapes", method: "PUT")
 operation RecursiveShapes {
-    input: RecursiveShapesInputOutput,
-    output: RecursiveShapesInputOutput
+    input := {
+        nested: RecursiveShapesInputOutputNested1
+    }
+    output := {
+        nested: RecursiveShapesInputOutputNested1
+    }
 }
 
 apply RecursiveShapes @httpRequestTests([
@@ -905,7 +1159,7 @@ apply RecursiveShapes @httpRequestTests([
         method: "PUT",
         uri: "/RecursiveShapes",
         body: """
-              <RecursiveShapesInputOutput>
+              <RecursiveShapesRequest>
                   <nested>
                       <foo>Foo1</foo>
                       <nested>
@@ -918,7 +1172,7 @@ apply RecursiveShapes @httpRequestTests([
                           </recursiveMember>
                       </nested>
                   </nested>
-              </RecursiveShapesInputOutput>
+              </RecursiveShapesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -948,7 +1202,7 @@ apply RecursiveShapes @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <RecursiveShapesInputOutput>
+              <RecursiveShapesResponse>
                   <nested>
                       <foo>Foo1</foo>
                       <nested>
@@ -961,7 +1215,7 @@ apply RecursiveShapes @httpResponseTests([
                           </recursiveMember>
                       </nested>
                   </nested>
-              </RecursiveShapesInputOutput>
+              </RecursiveShapesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -984,10 +1238,6 @@ apply RecursiveShapes @httpResponseTests([
     }
 ])
 
-structure RecursiveShapesInputOutput {
-    nested: RecursiveShapesInputOutputNested1
-}
-
 structure RecursiveShapesInputOutputNested1 {
     foo: String,
     nested: RecursiveShapesInputOutputNested2
@@ -1001,8 +1251,8 @@ structure RecursiveShapesInputOutputNested2 {
 // XML namespace
 @http(uri: "/XmlNamespaces", method: "POST")
 operation XmlNamespaces {
-    input: XmlNamespacesInputOutput,
-    output: XmlNamespacesInputOutput
+    input := with [XmlNamespacesInputOutput] {}
+    output := with [XmlNamespacesInputOutput] {}
 }
 
 apply XmlNamespaces @httpRequestTests([
@@ -1013,7 +1263,7 @@ apply XmlNamespaces @httpRequestTests([
         method: "POST",
         uri: "/XmlNamespaces",
         body: """
-              <XmlNamespacesInputOutput xmlns="http://foo.com">
+              <XmlNamespacesRequest xmlns="http://foo.com">
                   <nested>
                       <foo xmlns:baz="http://baz.com">Foo</foo>
                       <values xmlns="http://qux.com">
@@ -1021,7 +1271,7 @@ apply XmlNamespaces @httpRequestTests([
                           <member xmlns="http://bux.com">Baz</member>
                       </values>
                   </nested>
-              </XmlNamespacesInputOutput>
+              </XmlNamespacesRequest>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -1046,7 +1296,7 @@ apply XmlNamespaces @httpResponseTests([
         protocol: restXml,
         code: 200,
         body: """
-              <XmlNamespacesInputOutput xmlns="http://foo.com">
+              <XmlNamespacesResponse xmlns="http://foo.com">
                   <nested>
                       <foo xmlns:baz="http://baz.com">Foo</foo>
                       <values xmlns="http://qux.com">
@@ -1054,7 +1304,7 @@ apply XmlNamespaces @httpResponseTests([
                           <member xmlns="http://bux.com">Baz</member>
                       </values>
                   </nested>
-              </XmlNamespacesInputOutput>
+              </XmlNamespacesResponse>
               """,
         bodyMediaType: "application/xml",
         headers: {
@@ -1072,12 +1322,13 @@ apply XmlNamespaces @httpResponseTests([
     }
 ])
 
+@mixin
 @xmlNamespace(uri: "http://foo.com")
 structure XmlNamespacesInputOutput {
     nested: XmlNamespaceNested
 }
 
-// Ingored since it's not at the top-level
+// Ignored since it's not at the top-level
 @xmlNamespace(uri: "http://foo.com")
 structure XmlNamespaceNested {
     @xmlNamespace(uri: "http://baz.com", prefix: "baz")

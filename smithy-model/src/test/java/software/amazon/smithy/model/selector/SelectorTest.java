@@ -1,18 +1,7 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.selector;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -40,12 +29,14 @@ import org.junit.jupiter.api.Test;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.NodeMapper;
+import software.amazon.smithy.model.shapes.FloatShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MemberShape;
+import software.amazon.smithy.model.shapes.ResourceShape;
 import software.amazon.smithy.model.shapes.ServiceShape;
-import software.amazon.smithy.model.shapes.SetShape;
 import software.amazon.smithy.model.shapes.Shape;
 import software.amazon.smithy.model.shapes.ShapeId;
+import software.amazon.smithy.model.shapes.StringShape;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.traits.DynamicTrait;
 import software.amazon.smithy.model.traits.ErrorTrait;
@@ -58,18 +49,20 @@ import software.amazon.smithy.utils.SetUtils;
 public class SelectorTest {
 
     private static final String OPERATIONS_MISSING_BINDINGS = "service\n"
-                                                              + "$operations(~> operation)\n"
-                                                              + ":test(${operations}[trait|http])\n"
-                                                              + "${operations}\n"
-                                                              + ":not([trait|http])";
+            + "$operations(~> operation)\n"
+            + ":test(${operations}[trait|http])\n"
+            + "${operations}\n"
+            + ":not([trait|http])";
 
     private static Model modelJson;
     private static Model traitModel;
     private static Model httpModel;
+    private static Model resourceModel;
 
     @BeforeAll
     public static void before() {
-        modelJson = Model.assembler().addImport(SelectorTest.class.getResource("model.json"))
+        modelJson = Model.assembler()
+                .addImport(SelectorTest.class.getResource("model.json"))
                 .disablePrelude()
                 .assemble()
                 .unwrap();
@@ -82,6 +75,10 @@ public class SelectorTest {
                 .assemble()
                 .getResult() // ignore built-in errors
                 .get();
+        resourceModel = Model.assembler()
+                .addImport(SelectorTest.class.getResource("resource.smithy"))
+                .assemble()
+                .unwrap();
     }
 
     @Test
@@ -93,7 +90,7 @@ public class SelectorTest {
     }
 
     @Test
-    public void defaultSelectorInterfaceSelectCollectsStreamToSet() {
+    public void worksWithPreviousAssumptionsOfInterface() {
         Selector test = new Selector() {
             @Override
             public Stream<Shape> shapes(Model model) {
@@ -107,6 +104,9 @@ public class SelectorTest {
         };
 
         assertThat(test.select(modelJson), equalTo(modelJson.toSet()));
+
+        // This shouldn't fail with UnsupportedOperationException.
+        test.consumeMatches(modelJson, m -> {});
     }
 
     @Test
@@ -181,7 +181,8 @@ public class SelectorTest {
 
     @Test
     public void canSelectOnTraitObjectValues() {
-        Set<String> result = ids(traitModel, "[trait|externalDocumentation|(values)='https://www.anotherexample.com/']");
+        Set<String> result =
+                ids(traitModel, "[trait|externalDocumentation|(values)='https://www.anotherexample.com/']");
 
         assertThat(result, hasItem("smithy.example#DocumentedString2"));
         assertThat(result, not(hasItem("smithy.example#DocumentedString1")));
@@ -230,17 +231,15 @@ public class SelectorTest {
 
     @Test
     public void selectsCollections() {
+        // "collection" is just an alias for "list".
         Set<Shape> result = Selector.parse("collection").select(modelJson);
 
-        assertThat(result, containsInAnyOrder(
-                SetShape.builder()
-                        .id("ns.foo#Set")
-                        .member(MemberShape.builder().id("ns.foo#Set$member").target("ns.foo#String").build())
-                        .build(),
-                ListShape.builder()
-                        .id("ns.foo#List")
-                        .member(MemberShape.builder().id("ns.foo#List$member").target("ns.foo#String").build())
-                        .build()));
+        assertThat(result,
+                containsInAnyOrder(
+                        ListShape.builder()
+                                .id("ns.foo#List")
+                                .member(MemberShape.builder().id("ns.foo#List$member").target("ns.foo#String").build())
+                                .build()));
     }
 
     @Test
@@ -253,19 +252,20 @@ public class SelectorTest {
 
         Trait betaTrait = new DynamicTrait(ShapeId.from("com.example#beta"), Node.objectNode());
         Trait requiredTrait = new RequiredTrait();
-        assertThat(result, containsInAnyOrder(
-                MemberShape.builder()
-                        .id("com.example#AnotherStructureShape$bar")
-                        .target("com.example#MyShape")
-                        .addTrait(betaTrait)
-                        .addTrait(requiredTrait)
-                        .build(),
-                MemberShape.builder()
-                        .id("com.example#MyShape$foo")
-                        .target("com.example#StringShape")
-                        .addTrait(betaTrait)
-                        .addTrait(requiredTrait)
-                        .build()));
+        assertThat(result,
+                containsInAnyOrder(
+                        MemberShape.builder()
+                                .id("com.example#AnotherStructureShape$bar")
+                                .target("com.example#MyShape")
+                                .addTrait(betaTrait)
+                                .addTrait(requiredTrait)
+                                .build(),
+                        MemberShape.builder()
+                                .id("com.example#MyShape$foo")
+                                .target("com.example#StringShape")
+                                .addTrait(betaTrait)
+                                .addTrait(requiredTrait)
+                                .build()));
     }
 
     @Test
@@ -476,9 +476,9 @@ public class SelectorTest {
                 "[id|member=abc]",
                 "[id|namespace=abc]",
                 "[id|namespace|(foo)=abc]", // invalid, tolerated
-                "[id|blurb=abc]",  // invalid, tolerated
+                "[id|blurb=abc]", // invalid, tolerated
                 "[service|version=abc]",
-                "[service|blurb=abc]",  // invalid, tolerated
+                "[service|blurb=abc]", // invalid, tolerated
                 "[trait|foo=abc]");
 
         for (String expr : exprs) {
@@ -531,10 +531,11 @@ public class SelectorTest {
         Set<String> matches2 = ids(traitModel, "[trait|enum|(values)|value = 'm256.mega' ,'nope' ]");
         Set<String> matches3 = ids(traitModel, "[trait|enum|(values)|value = 'm256.mega' ,   nope ]");
 
-        assertThat(matches1, containsInAnyOrder(
-                "smithy.example#DocumentedString1",
-                "smithy.example#DocumentedString2",
-                "smithy.example#EnumString"));
+        assertThat(matches1,
+                containsInAnyOrder(
+                        "smithy.example#DocumentedString1",
+                        "smithy.example#DocumentedString2",
+                        "smithy.example#EnumString"));
         assertThat(matches1, equalTo(matches2));
         assertThat(matches1, equalTo(matches3));
     }
@@ -593,8 +594,8 @@ public class SelectorTest {
     }
 
     @Test
-    public void toleratesGettingNullPropertyFromString() {
-        assertThat(ids(traitModel, "[id|no|no=100]"), empty());
+    public void doesNotToleratesInvalidIdAccess() {
+        Assertions.assertThrows(SelectorException.class, () -> ids(traitModel, "[id|no|no=100]"));
     }
 
     @Test
@@ -633,12 +634,8 @@ public class SelectorTest {
     }
 
     @Test
-    public void toleratesUnknownServicePaths() {
-        Set<String> services1 = ids(traitModel, "[service|foo|baz='bam']");
-        Set<String> services2 = ids(traitModel, "[service|foo|baz]");
-
-        assertThat(services1, empty());
-        assertThat(services2, empty());
+    public void doesNotTolerateUnknownServicePaths() {
+        Assertions.assertThrows(SelectorException.class, () -> ids(traitModel, "[service|foo|baz='bam']"));
     }
 
     @Test
@@ -736,6 +733,26 @@ public class SelectorTest {
     }
 
     @Test
+    public void evaluatesScopedAttributesWithOr() {
+        final Model enumModel = Model.assembler()
+                .addImport(SelectorTest.class.getResource("enums.smithy"))
+                .assemble()
+                .unwrap();
+
+        Set<String> shapes = ids(
+                enumModel,
+                "[@trait|enum|(values): @{name} ^= DIA, CLU]");
+
+        assertThat(shapes, containsInAnyOrder("smithy.example#Suit"));
+
+        shapes = ids(
+                enumModel,
+                "[@trait|enum|(values): @{name} ^= DIA, BLA]");
+
+        assertThat(shapes, containsInAnyOrder("smithy.example#Color", "smithy.example#Suit"));
+    }
+
+    @Test
     public void evaluatesScopedAttributesWithProjections() {
         // Note that the projection can be on either side.
         Set<String> shapes1 = ids(traitModel, "[@trait|enum|(values): @{name}=@{value} && @{tags|(values)}=hi]");
@@ -749,17 +766,18 @@ public class SelectorTest {
     public void projectionsCanMatchThemselvesThroughIntersection() {
         // Any enum with tags should match it's own tags.
         Set<String> shapes1 = ids(traitModel, "[@trait|enum|(values): @{tags|(values)}=@{tags|(values)}]");
-        Set<String> shapes2 = ids(traitModel, "[@trait|enum|(values): @{tags}?=true]");
 
-        assertThat(shapes1, not(empty()));
-        assertThat(shapes2, equalTo(shapes1));
+        assertThat(shapes1, containsInAnyOrder("smithy.example#EnumString", "smithy.example#DocumentedString1"));
     }
 
     @Test
     public void nestedProjectionsAreFlattened() {
-        Set<String> shapes1 = ids(traitModel, "[@trait|smithy.example#listyTrait|(values)|(values)|(values): @{foo}=a]");
-        Set<String> shapes2 = ids(traitModel, "[@trait|smithy.example#listyTrait|(values)|(values)|(values): @{foo}=b]");
-        Set<String> shapes3 = ids(traitModel, "[@trait|smithy.example#listyTrait|(values)|(values)|(values): @{foo}=c]");
+        Set<String> shapes1 =
+                ids(traitModel, "[@trait|smithy.example#listyTrait|(values)|(values)|(values): @{foo}=a]");
+        Set<String> shapes2 =
+                ids(traitModel, "[@trait|smithy.example#listyTrait|(values)|(values)|(values): @{foo}=b]");
+        Set<String> shapes3 =
+                ids(traitModel, "[@trait|smithy.example#listyTrait|(values)|(values)|(values): @{foo}=c]");
 
         assertThat(shapes1, contains("smithy.example#MyService"));
         assertThat(shapes2, equalTo(shapes1));
@@ -829,9 +847,9 @@ public class SelectorTest {
     @Test
     public void canBindShapeAsContext() {
         assertThat(ids(traitModel, "[trait|trait][@: @{trait|(keys)} = @{id}]"),
-                   hasItems("smithy.example#recursiveTrait",
-                            "smithy.api#trait",
-                            "smithy.api#documentation"));
+                hasItems("smithy.example#recursiveTrait",
+                        "smithy.api#trait",
+                        "smithy.api#documentation"));
     }
 
     @Test
@@ -878,12 +896,12 @@ public class SelectorTest {
         // auth traits that don't match the auth traits associated with the service.
         Selector selector = Selector.parse(
                 "service\n"
-                + "$service(*)\n"
-                + "$authTraits(-[trait]-> [trait|authDefinition])\n"
-                + "~>\n"
-                + "operation\n"
-                + "[trait|auth]"
-                + ":not([@: @{trait|auth|(values)} {<} @{var|authTraits|id}]))");
+                        + "$service(*)\n"
+                        + "$authTraits(-[trait]-> [trait|authDefinition])\n"
+                        + "~>\n"
+                        + "operation\n"
+                        + "[trait|auth]"
+                        + ":not([@: @{trait|auth|(values)} {<} @{var|authTraits|id}]))");
 
         List<Pair<Shape, Map<String, Set<Shape>>>> results = new ArrayList<>();
         selector.runner().model(result).selectMatches((s, vars) -> results.add(Pair.of(s, vars)));
@@ -896,20 +914,23 @@ public class SelectorTest {
         // means that the variables available to a shape are specific to each shape
         // as it passes through the selector. These test that each select saw different,
         // expected variables.
-        checkMatches(results, "Expected smithy.example#HasDigestAuth with a service of smithy.example#MyService1",
+        checkMatches(results,
+                "Expected smithy.example#HasDigestAuth with a service of smithy.example#MyService1",
                 (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasDigestAuth"))
-                          && v.containsKey("service")
-                          && v.get("service").equals(SetUtils.of(service1)));
+                        && v.containsKey("service")
+                        && v.get("service").equals(SetUtils.of(service1)));
 
-        checkMatches(results, "Expected smithy.example#HasDigestAuth with a service of smithy.example#MyService2",
-                     (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasDigestAuth"))
-                               && v.containsKey("service")
-                               && v.get("service").equals(SetUtils.of(service2)));
+        checkMatches(results,
+                "Expected smithy.example#HasDigestAuth with a service of smithy.example#MyService2",
+                (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasDigestAuth"))
+                        && v.containsKey("service")
+                        && v.get("service").equals(SetUtils.of(service2)));
 
-        checkMatches(results, "Expected smithy.example#HasBasicAuth with a service of smithy.example#MyService2",
-                     (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasBasicAuth"))
-                               && v.containsKey("service")
-                               && v.get("service").equals(SetUtils.of(service2)));
+        checkMatches(results,
+                "Expected smithy.example#HasBasicAuth with a service of smithy.example#MyService2",
+                (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasBasicAuth"))
+                        && v.containsKey("service")
+                        && v.get("service").equals(SetUtils.of(service2)));
     }
 
     private void checkMatches(
@@ -938,11 +959,11 @@ public class SelectorTest {
         // http bindings on other operations, but the operation does not use http bindings.
         Selector selector = Selector.parse(
                 "$service(service)\n"
-                + "${service}\n"
-                + "$operations(~> operation)\n"
-                + "$httpOperations(${operations}[trait|http])\n"
-                + "${operations}\n"
-                + ":not([trait|http])");
+                        + "${service}\n"
+                        + "$operations(~> operation)\n"
+                        + "$httpOperations(${operations}[trait|http])\n"
+                        + "${operations}\n"
+                        + ":not([trait|http])");
 
         List<Pair<Shape, Map<String, Set<Shape>>>> results = new ArrayList<>();
         selector.runner().model(result).selectMatches((s, vars) -> results.add(Pair.of(s, vars)));
@@ -956,14 +977,15 @@ public class SelectorTest {
         assertThat(results, hasSize(2));
 
         for (Shape service : ListUtils.of(service1, service2)) {
-            checkMatches(results, "Expected smithy.example#HasBasicAuth with a service of smithy.example#MyService1",
-                         (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasBasicAuth"))
-                                   && v.containsKey("service")
-                                   && v.containsKey("operations")
-                                   && v.containsKey("httpOperations")
-                                   && v.get("service").equals(SetUtils.of(service))
-                                   && v.get("operations").equals(SetUtils.of(digestAuth, noAuth, basicAuth))
-                                   && v.get("httpOperations").equals(SetUtils.of(digestAuth, noAuth)));
+            checkMatches(results,
+                    "Expected smithy.example#HasBasicAuth with a service of smithy.example#MyService1",
+                    (s, v) -> s.getId().equals(ShapeId.from("smithy.example#HasBasicAuth"))
+                            && v.containsKey("service")
+                            && v.containsKey("operations")
+                            && v.containsKey("httpOperations")
+                            && v.get("service").equals(SetUtils.of(service))
+                            && v.get("operations").equals(SetUtils.of(digestAuth, noAuth, basicAuth))
+                            && v.get("httpOperations").equals(SetUtils.of(digestAuth, noAuth)));
         }
     }
 
@@ -1047,5 +1069,106 @@ public class SelectorTest {
         Set<Shape> result = selector.select(model);
 
         assertThat(result, containsInAnyOrder(errorShape));
+    }
+
+    @Test
+    public void selectsStructuresWithMixins() {
+        Model model = Model.assembler()
+                .addImport(getClass().getResource("structure-with-mixins.smithy"))
+                .assemble()
+                .unwrap();
+        Selector hasMixins = Selector.parse("structure :test(-[mixin]->)");
+        Selector isUsedMixin = Selector.parse("structure -[mixin]->");
+        Selector noMixins = Selector.parse("structure[id|namespace='smithy.example'] :not(-[mixin]->)");
+        Selector unusedMixin = Selector.parse("[trait|mixin][id|namespace='smithy.example'] :not(<-[mixin]-)");
+
+        assertThat(hasMixins.select(model).stream().map(Shape::toShapeId).collect(Collectors.toSet()),
+                containsInAnyOrder(ShapeId.from("smithy.example#Mixin2"), ShapeId.from("smithy.example#Concrete")));
+
+        assertThat(isUsedMixin.select(model).stream().map(Shape::toShapeId).collect(Collectors.toSet()),
+                containsInAnyOrder(ShapeId.from("smithy.example#Mixin1"), ShapeId.from("smithy.example#Mixin2")));
+
+        assertThat(noMixins.select(model).stream().map(Shape::toShapeId).collect(Collectors.toSet()),
+                containsInAnyOrder(ShapeId.from("smithy.example#Mixin1"),
+                        ShapeId.from("smithy.example#NoMixins"),
+                        ShapeId.from("smithy.example#UnusedMixin")));
+
+        assertThat(unusedMixin.select(model).stream().map(Shape::toShapeId).collect(Collectors.toSet()),
+                contains(ShapeId.from("smithy.example#UnusedMixin")));
+    }
+
+    @Test
+    public void supportsResourceProperties() {
+        Set<Shape> resourcesWithProperties = Selector.parse("resource :test(-[property]->)").select(resourceModel);
+        ResourceShape forecastResource = resourceModel.expectShape(ShapeId.from("example.weather#Forecast"),
+                ResourceShape.class);
+        ResourceShape cityResource = resourceModel.expectShape(ShapeId.from("example.weather#City"),
+                ResourceShape.class);
+        assertThat(resourcesWithProperties.size(), equalTo(2));
+        assertThat(resourcesWithProperties, containsInAnyOrder(forecastResource, cityResource));
+
+        Set<Shape> shapesTargettedByAnyProperty = Selector.parse("resource -[property]-> *").select(resourceModel);
+        StructureShape coordinatesShape = resourceModel.expectShape(ShapeId.from("example.weather#CityCoordinates"),
+                StructureShape.class);
+        FloatShape floatShape = resourceModel.expectShape(ShapeId.from("smithy.api#Float"), FloatShape.class);
+        StringShape stringShape = resourceModel.expectShape(ShapeId.from("smithy.api#String"), StringShape.class);
+        assertThat(shapesTargettedByAnyProperty.size(), equalTo(3));
+        assertThat(shapesTargettedByAnyProperty,
+                containsInAnyOrder(coordinatesShape,
+                        floatShape,
+                        stringShape));
+
+        Set<Shape> shapesTargettedByCityOnly = Selector.parse("resource [id|name=City] -[property]-> *")
+                .select(resourceModel);
+        assertThat(shapesTargettedByCityOnly.size(), equalTo(2));
+        assertThat(shapesTargettedByCityOnly, containsInAnyOrder(coordinatesShape, stringShape));
+    }
+
+    @Test
+    public void rootFunctionReturnsAllShapes() {
+        Selector selector = Selector.parse("string"
+                + ":in(:root(-[input]-> ~> *))"
+                + ":not(:in(:root(-[output]-> ~> *)))");
+        Set<Shape> result = selector.select(resourceModel);
+
+        // This is the only string used in input but not output.
+        assertThat(result, contains(resourceModel.expectShape(ShapeId.from("example.weather#CityId"))));
+    }
+
+    @Test
+    public void inefficientIfNotCached() {
+        Selector selector = Selector.parse(":in(:root(service ~> number))");
+        Set<Shape> result = selector.select(resourceModel);
+
+        // This is the only number used in any service.
+        assertThat(result, contains(resourceModel.expectShape(ShapeId.from("smithy.api#Float"))));
+    }
+
+    @Test
+    public void allowsNestedRoots() {
+        Selector selector = Selector.parse(":root(:root(:root(*)))");
+        Set<Shape> result = selector.select(resourceModel);
+
+        assertThat(result, equalTo(resourceModel.toSet()));
+    }
+
+    @Test
+    public void inDoesNotSupportMoreThanOneSelector() {
+        Assertions.assertThrows(SelectorSyntaxException.class, () -> Selector.parse(":in(*, *)"));
+    }
+
+    @Test
+    public void inRequiresOneSelector() {
+        Assertions.assertThrows(SelectorSyntaxException.class, () -> Selector.parse(":in()"));
+    }
+
+    @Test
+    public void rootDoesNotSupportMoreThanOneSelector() {
+        Assertions.assertThrows(SelectorSyntaxException.class, () -> Selector.parse(":root(*, *)"));
+    }
+
+    @Test
+    public void rootRequiresOneSelector() {
+        Assertions.assertThrows(SelectorSyntaxException.class, () -> Selector.parse(":root()"));
     }
 }

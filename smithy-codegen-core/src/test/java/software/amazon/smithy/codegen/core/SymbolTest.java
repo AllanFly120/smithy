@@ -1,23 +1,14 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.codegen.core;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,7 +27,7 @@ public class SymbolTest {
     }
 
     @Test
-    public void getsTypedProperties() {
+    public void getsPropertiesFromClass() {
         Symbol symbol = Symbol.builder()
                 .name("foo")
                 .putProperty("baz", "bar")
@@ -48,11 +39,36 @@ public class SymbolTest {
     }
 
     @Test
+    public void getsTypedProperties() {
+        Property<String> stringProperty = Property.named("string");
+        Property<Integer> integerProperty = Property.named("int");
+
+        Symbol symbol = Symbol.builder()
+                .name("foo")
+                .putProperty(stringProperty, "foo")
+                .putProperty(integerProperty, 100)
+                .build();
+
+        assertThat(symbol.expectProperty(stringProperty), equalTo("foo"));
+        assertThat(symbol.expectProperty(integerProperty), equalTo(100));
+    }
+
+    @Test
     public void throwsIfExpectedPropertyIsNotPresent() {
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
             Symbol symbol = Symbol.builder().name("foo").build();
 
             symbol.expectProperty("baz");
+        });
+    }
+
+    @Test
+    public void throwsIfExpectedTypedPropertyIsNotPresent() {
+        Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            Property<String> prop = Property.named("prop");
+            Symbol symbol = Symbol.builder().name("foo").build();
+
+            symbol.expectProperty(prop);
         });
     }
 
@@ -113,5 +129,38 @@ public class SymbolTest {
 
         assertThat(symbol.getDependencies(), containsInAnyOrder(a, b));
         assertThat(symbol.toBuilder().build(), equalTo(symbol));
+    }
+
+    @Test
+    public void convertsToAliasedSymbolReference() {
+        Symbol symbol = Symbol.builder()
+                .name("foo")
+                .namespace("bar", ".")
+                .build();
+        SymbolReference reference = symbol.toReference("__foo", SymbolReference.ContextOption.DECLARE);
+
+        assertThat(reference.getSymbol(), is(symbol));
+        assertThat(reference.getAlias(), equalTo("__foo"));
+        assertThat(reference.getOptions(), contains(SymbolReference.ContextOption.DECLARE));
+    }
+
+    @Test
+    public void convertsToAliasedSymbol() {
+        Symbol symbol = Symbol.builder()
+                .name("foo")
+                .namespace("bar", ".")
+                .build();
+
+        Symbol symbolRef = symbol.toReferencedSymbol("__foo");
+
+        SymbolReference ref = SymbolReference.builder()
+                .alias("__foo")
+                .symbol(symbol)
+                .options(SymbolReference.ContextOption.USE)
+                .build();
+
+        assertThat(symbolRef.getName(), equalTo("__foo"));
+        assertThat(symbolRef.getNamespace(), equalTo(""));
+        assertThat(symbolRef.getReferences(), contains(ref));
     }
 }

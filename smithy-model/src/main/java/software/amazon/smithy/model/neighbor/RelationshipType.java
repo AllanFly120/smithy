@@ -1,32 +1,26 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.model.neighbor;
 
 import java.util.Optional;
 import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.selector.Selector;
+import software.amazon.smithy.model.shapes.EnumShape;
+import software.amazon.smithy.model.shapes.IntEnumShape;
 import software.amazon.smithy.model.shapes.ListShape;
 import software.amazon.smithy.model.shapes.MapShape;
 import software.amazon.smithy.model.shapes.MemberShape;
 import software.amazon.smithy.model.shapes.OperationShape;
 import software.amazon.smithy.model.shapes.ResourceShape;
 import software.amazon.smithy.model.shapes.SetShape;
+import software.amazon.smithy.model.shapes.ShapeId;
 import software.amazon.smithy.model.shapes.StructureShape;
 import software.amazon.smithy.model.shapes.UnionShape;
+import software.amazon.smithy.model.traits.IdRefTrait;
 import software.amazon.smithy.model.traits.TraitDefinition;
+import software.amazon.smithy.utils.SmithyInternalApi;
 
 /**
  * Defines the relationship types between neighboring shapes.
@@ -48,31 +42,16 @@ public enum RelationshipType {
 
     /**
      * A collection operation relationship exists between a resource and the
-     * operations bound to the resource in the "collectionOperations", "create",
-     * and "list" properties.
+     * operations bound to the resource in the "collectionOperations" property.
      */
     COLLECTION_OPERATION("collectionOperation", RelationshipDirection.DIRECTED),
 
-    /**
-     * An instance operation relationship exists between a resource and the
-     * operations bound to the resource in the "Operations", "put", "read",
-     * "update", and "delete" properties.
-     */
+    @Deprecated
+    @SmithyInternalApi
     INSTANCE_OPERATION("instanceOperation", RelationshipDirection.DIRECTED),
 
-    /**
-     * A BINDING relationship exists between the following shapes:
-     *
-     * <ul>
-     *     <li>Between an operation and the service or resource that the
-     *     operation is bound to (through operations or a lifecycle).</li>
-     *     <li>Between a resource and the resource or service that the
-     *     resource is bound to in the "resources" property.</li>
-     * </ul>
-     *
-     * The subject of the relationship is that shape that was bound, and the
-     * target is the shape that declared the binding.
-     */
+    @Deprecated
+    @SmithyInternalApi
     BOUND("bound", RelationshipDirection.INVERTED),
 
     /**
@@ -118,6 +97,12 @@ public enum RelationshipType {
     IDENTIFIER("identifier", RelationshipDirection.DIRECTED),
 
     /**
+     * Relationships that exist between a {@link ResourceShape member} and
+     * the shapes that are referenced by its properties property.
+     */
+    PROPERTY("property", RelationshipDirection.DIRECTED),
+
+    /**
      * Relationships exist on {@link MemberShape member} shapes. The subject
      * of the relationship is the member shape, and the neighbor is the
      * aggregate shape that contains the member.
@@ -153,6 +138,18 @@ public enum RelationshipType {
     ERROR("error", RelationshipDirection.DIRECTED),
 
     /**
+     * Relationships that exist on {@link EnumShape enum} shapes to their
+     * {@link MemberShape member shapes}.
+     */
+    ENUM_MEMBER("member", RelationshipDirection.DIRECTED),
+
+    /**
+     * Relationships that exist on {@link IntEnumShape intEnum} shapes to their
+     * {@link MemberShape member shapes}.
+     */
+    INT_ENUM_MEMBER("member", RelationshipDirection.DIRECTED),
+
+    /**
      * Relationships that exist on {@link ListShape list} shapes to their
      * {@link MemberShape member shapes}.
      */
@@ -162,6 +159,7 @@ public enum RelationshipType {
      * Relationships that exist on {@link SetShape set} shapes to their
      * {@link MemberShape member shapes}.
      */
+    @Deprecated
     SET_MEMBER("member", RelationshipDirection.DIRECTED),
 
     /**
@@ -201,7 +199,43 @@ public enum RelationshipType {
      * with {@link NeighborProvider#withTraitRelationships(Model, NeighborProvider)}
      * in order to yield trait relationships.
      */
-    TRAIT("trait", RelationshipDirection.DIRECTED);
+    TRAIT("trait", RelationshipDirection.DIRECTED),
+
+    /**
+     * Relationship that exists between a structure or union and a mixin applied
+     * to the shape.
+     */
+    MIXIN("mixin", RelationshipDirection.DIRECTED),
+
+    /**
+     * Relationships that exist between a shape and another shape referenced by an
+     * {@link IdRefTrait}.
+     *
+     * <p>This relationship is formed by applying a trait with a value containing a
+     * reference to another {@link ShapeId}. For
+     * example:
+     * <pre>
+     * {@code
+     * @trait
+     * structure myRef {
+     *     @idRef
+     *     shape: String
+     * }
+     *
+     * // @myRef trait applied, and the value references the shape `Referenced`
+     * @myRef(shape: Referenced)
+     * structure WithMyRef {}
+     *
+     * string Referenced
+     * }
+     * </pre>
+     *
+     * <p>This kind of relationship is not returned by default from a
+     * {@link NeighborProvider}. You must explicitly wrap a {@link NeighborProvider}
+     * with {@link NeighborProvider#withIdRefRelationships(Model, NeighborProvider)}
+     * in order to yield idRef relationships.
+     */
+    ID_REF(null, RelationshipDirection.DIRECTED);
 
     private String selectorLabel;
     private RelationshipDirection direction;
@@ -238,5 +272,69 @@ public enum RelationshipType {
      */
     public RelationshipDirection getDirection() {
         return direction;
+    }
+
+    /**
+     * Checks if the given relationship connects a container shape to a member.
+     *
+     * @return Returns true if a member.
+     */
+    public boolean isMemberBinding() {
+        switch (this) {
+            case STRUCTURE_MEMBER:
+            case UNION_MEMBER:
+            case LIST_MEMBER:
+            case SET_MEMBER:
+            case MAP_KEY:
+            case MAP_VALUE:
+            case INT_ENUM_MEMBER:
+            case ENUM_MEMBER:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Checks if the binding is to an operation (create|read|update|delete|put|list|operation|collectionOperation).
+     *
+     * @return Returns true if the binding is for any kind of operation binding.
+     */
+    public boolean isOperationBinding() {
+        return isInstanceOperationBinding() || isCollectionOperationBinding();
+    }
+
+    /**
+     * Returns true if relationship connects a resource to an instance operation.
+     *
+     * @return True if an instance operation.
+     */
+    public boolean isInstanceOperationBinding() {
+        switch (this) {
+            case OPERATION:
+            case READ:
+            case UPDATE:
+            case DELETE:
+            case PUT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Returns true if relationship connects a resource to a collection operation.
+     *
+     * @return True if a collection operation.
+     */
+    public boolean isCollectionOperationBinding() {
+        switch (this) {
+            case COLLECTION_OPERATION:
+            case CREATE:
+            case LIST:
+                return true;
+            default:
+                return false;
+        }
     }
 }

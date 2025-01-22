@@ -1,12 +1,15 @@
 // See ChangedMemberTargetTest
+$version: "2.0"
+
 namespace smithy.example
 
-set A {
+structure A {
     member: B2
 }
 
-set B2 {
-    member: MyString
+map B2 {
+    key: MyString
+    value: MyString
 }
 
 string MyString

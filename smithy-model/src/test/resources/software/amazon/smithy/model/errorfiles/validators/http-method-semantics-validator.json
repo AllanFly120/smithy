@@ -1,12 +1,12 @@
 {
-    "smithy": "1.0",
+    "smithy": "2.0",
     "shapes": {
         "ns.foo#A": {
             "type": "operation",
             "traits": {
                 "smithy.api#readonly": {},
                 "smithy.api#http": {
-                    "method": "GET",
+                    "method": "Get",
                     "uri": "/A"
                 }
             }
@@ -120,6 +120,9 @@
                         "smithy.api#httpPayload": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#input": {}
             }
         },
         "ns.foo#L": {
@@ -149,7 +152,16 @@
                     "traits": {
                         "smithy.api#required": {}
                     }
+                },
+                "morePayload": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#input": {}
             }
         },
         "ns.foo#M": {
@@ -171,6 +183,9 @@
                 "payload": {
                     "target": "smithy.api#String"
                 }
+            },
+            "traits": {
+                "smithy.api#input": {}
             }
         },
         "ns.foo#N": {
@@ -198,7 +213,10 @@
         },
         "ns.foo#OptionsInput": {
             "type": "structure",
-            "members": {}
+            "members": {},
+            "traits": {
+                "smithy.api#input": {}
+            }
         }
     }
 }

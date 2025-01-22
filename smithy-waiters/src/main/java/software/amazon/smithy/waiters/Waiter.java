@@ -1,21 +1,9 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.waiters;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,7 +15,7 @@ import software.amazon.smithy.model.node.NumberNode;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.node.StringNode;
 import software.amazon.smithy.model.node.ToNode;
-import software.amazon.smithy.utils.ListUtils;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.SetUtils;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.Tagged;
@@ -47,7 +35,12 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
     private static final int DEFAULT_MIN_DELAY = 2;
     private static final int DEFAULT_MAX_DELAY = 120;
     private static final Set<String> KEYS = SetUtils.of(
-            DOCUMENTATION, ACCEPTORS, MIN_DELAY, MAX_DELAY, TAGS, DEPRECATED);
+            DOCUMENTATION,
+            ACCEPTORS,
+            MIN_DELAY,
+            MAX_DELAY,
+            TAGS,
+            DEPRECATED);
 
     private final String documentation;
     private final List<Acceptor> acceptors;
@@ -58,11 +51,11 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
 
     private Waiter(Builder builder) {
         this.documentation = builder.documentation;
-        this.acceptors = ListUtils.copyOf(builder.acceptors);
+        this.acceptors = builder.acceptors.copy();
         this.minDelay = builder.minDelay;
         this.maxDelay = builder.maxDelay;
         this.deprecated = builder.deprecated;
-        this.tags = ListUtils.copyOf(builder.tags);
+        this.tags = builder.tags.copy();
     }
 
     public static Builder builder() {
@@ -70,7 +63,7 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
     }
 
     @Override
-    public SmithyBuilder<Waiter> toBuilder() {
+    public Builder toBuilder() {
         return builder()
                 .documentation(getDocumentation().orElse(null))
                 .acceptors(getAcceptors())
@@ -192,11 +185,11 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
 
         Waiter waiter = (Waiter) o;
         return minDelay == waiter.minDelay
-               && maxDelay == waiter.maxDelay
-               && Objects.equals(documentation, waiter.documentation)
-               && acceptors.equals(waiter.acceptors)
-               && tags.equals(waiter.tags)
-               && deprecated == waiter.deprecated;
+                && maxDelay == waiter.maxDelay
+                && Objects.equals(documentation, waiter.documentation)
+                && acceptors.equals(waiter.acceptors)
+                && tags.equals(waiter.tags)
+                && deprecated == waiter.deprecated;
     }
 
     @Override
@@ -207,11 +200,11 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
     public static final class Builder implements SmithyBuilder<Waiter> {
 
         private String documentation;
-        private final List<Acceptor> acceptors = new ArrayList<>();
+        private final BuilderRef<List<Acceptor>> acceptors = BuilderRef.forList();
         private int minDelay = DEFAULT_MIN_DELAY;
         private int maxDelay = DEFAULT_MAX_DELAY;
         private boolean deprecated = false;
-        private final List<String> tags = new ArrayList<>();
+        private final BuilderRef<List<String>> tags = BuilderRef.forList();
 
         private Builder() {}
 
@@ -237,7 +230,7 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
         }
 
         public Builder addAcceptor(Acceptor acceptor) {
-            this.acceptors.add(Objects.requireNonNull(acceptor));
+            this.acceptors.get().add(Objects.requireNonNull(acceptor));
             return this;
         }
 
@@ -263,7 +256,7 @@ public final class Waiter implements Tagged, ToNode, ToSmithyBuilder<Waiter> {
         }
 
         public Builder addTag(String tag) {
-            this.tags.add(Objects.requireNonNull(tag));
+            this.tags.get().add(Objects.requireNonNull(tag));
             return this;
         }
 

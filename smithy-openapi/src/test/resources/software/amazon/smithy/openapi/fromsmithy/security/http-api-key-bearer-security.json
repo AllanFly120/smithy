@@ -1,5 +1,5 @@
 {
-    "smithy": "1.0",
+    "smithy": "2.0",
     "shapes": {
         "smithy.example#Service": {
             "type": "service",
@@ -14,7 +14,7 @@
                 "smithy.api#httpApiKeyAuth": {
                     "name": "Authorization",
                     "in": "header",
-                    "scheme": "ApiKey"
+                    "scheme": "whatever-scheme-we-want"
                 }
             }
         },

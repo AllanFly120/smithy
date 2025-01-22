@@ -19,7 +19,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "MyOperation response"
+                        "description": "MyOperation 200 response"
                     }
                 }
             }
@@ -44,8 +44,7 @@
                                     "-Infinity"
                                 ]
                             }
-                        ],
-                        "nullable": true
+                        ]
                     },
                     "doubleMember": {
                         "oneOf": [
@@ -61,8 +60,7 @@
                                     "-Infinity"
                                 ]
                             }
-                        ],
-                        "nullable": true
+                        ]
                     }
                 }
             }

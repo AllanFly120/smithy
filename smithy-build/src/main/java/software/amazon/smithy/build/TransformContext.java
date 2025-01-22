@@ -1,23 +1,11 @@
 /*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.build;
 
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -25,7 +13,8 @@ import software.amazon.smithy.model.Model;
 import software.amazon.smithy.model.node.Node;
 import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.transform.ModelTransformer;
-import software.amazon.smithy.utils.SetUtils;
+import software.amazon.smithy.model.validation.ValidationEvent;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
@@ -43,16 +32,16 @@ public final class TransformContext implements ToSmithyBuilder<TransformContext>
     private final Set<Path> sources;
     private final String projectionName;
     private final ModelTransformer transformer;
-    private final Set<String> visited;
+    private final List<ValidationEvent> originalModelValidationEvents;
 
     private TransformContext(Builder builder) {
         model = SmithyBuilder.requiredState("model", builder.model);
         transformer = builder.transformer != null ? builder.transformer : ModelTransformer.create();
         settings = builder.settings;
         originalModel = builder.originalModel;
-        sources = SetUtils.copyOf(builder.sources);
         projectionName = builder.projectionName;
-        visited = new LinkedHashSet<>(builder.visited);
+        sources = builder.sources.copy();
+        originalModelValidationEvents = builder.originalModelValidationEvents.copy();
     }
 
     /**
@@ -71,7 +60,7 @@ public final class TransformContext implements ToSmithyBuilder<TransformContext>
                 .sources(sources)
                 .projectionName(projectionName)
                 .transformer(transformer)
-                .visited(visited);
+                .originalModelValidationEvents(originalModelValidationEvents);
     }
 
     /**
@@ -138,15 +127,13 @@ public final class TransformContext implements ToSmithyBuilder<TransformContext>
     }
 
     /**
-     * Gets the set of previously visited transforms.
+     * Gets an immutable list of {@link ValidationEvent}s that were
+     * encountered when loading the source model.
      *
-     * <p>This method is used as bookkeeping for the {@code apply}
-     * plugin to detect cycles.
-     *
-     * @return Returns the ordered set of visited projections.
+     * @return Returns the encountered validation events.
      */
-    public Set<String> getVisited() {
-        return visited;
+    public List<ValidationEvent> getOriginalModelValidationEvents() {
+        return originalModelValidationEvents;
     }
 
     /**
@@ -157,10 +144,10 @@ public final class TransformContext implements ToSmithyBuilder<TransformContext>
         private ObjectNode settings = Node.objectNode();
         private Model model;
         private Model originalModel;
-        private Set<Path> sources = Collections.emptySet();
+        private BuilderRef<Set<Path>> sources = BuilderRef.forOrderedSet();
         private String projectionName = "source";
         private ModelTransformer transformer;
-        private Set<String> visited = Collections.emptySet();
+        private final BuilderRef<List<ValidationEvent>> originalModelValidationEvents = BuilderRef.forList();
 
         private Builder() {}
 
@@ -185,7 +172,8 @@ public final class TransformContext implements ToSmithyBuilder<TransformContext>
         }
 
         public Builder sources(Set<Path> sources) {
-            this.sources = Objects.requireNonNull(sources);
+            this.sources.clear();
+            this.sources.get().addAll(sources);
             return this;
         }
 
@@ -199,8 +187,9 @@ public final class TransformContext implements ToSmithyBuilder<TransformContext>
             return this;
         }
 
-        public Builder visited(Set<String> visited) {
-            this.visited = visited;
+        public Builder originalModelValidationEvents(List<ValidationEvent> originalModelValidationEvents) {
+            this.originalModelValidationEvents.clear();
+            this.originalModelValidationEvents.get().addAll(originalModelValidationEvents);
             return this;
         }
     }

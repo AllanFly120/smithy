@@ -1,24 +1,12 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 package software.amazon.smithy.build;
 
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,7 +19,7 @@ import software.amazon.smithy.model.node.ObjectNode;
 import software.amazon.smithy.model.shapes.ToShapeId;
 import software.amazon.smithy.model.transform.ModelTransformer;
 import software.amazon.smithy.model.validation.ValidationEvent;
-import software.amazon.smithy.utils.SetUtils;
+import software.amazon.smithy.utils.BuilderRef;
 import software.amazon.smithy.utils.SmithyBuilder;
 import software.amazon.smithy.utils.ToSmithyBuilder;
 
@@ -48,18 +36,20 @@ public final class PluginContext implements ToSmithyBuilder<PluginContext> {
     private final FileManifest fileManifest;
     private final ClassLoader pluginClassLoader;
     private final Set<Path> sources;
+    private final String artifactName;
     private Model nonTraitsModel;
 
     private PluginContext(Builder builder) {
         model = SmithyBuilder.requiredState("model", builder.model);
         fileManifest = SmithyBuilder.requiredState("fileManifest", builder.fileManifest);
+        artifactName = builder.artifactName;
         projection = builder.projection;
         projectionName = builder.projectionName;
         originalModel = builder.originalModel;
         events = Collections.unmodifiableList(builder.events);
         settings = builder.settings;
         pluginClassLoader = builder.pluginClassLoader;
-        sources = SetUtils.copyOf(builder.sources);
+        sources = builder.sources.copy();
     }
 
     /**
@@ -87,6 +77,20 @@ public final class PluginContext implements ToSmithyBuilder<PluginContext> {
      */
     public String getProjectionName() {
         return projectionName;
+    }
+
+    /**
+     * Gets the plugin artifact name, if present.
+     *
+     * <p>An artifact name is given to a plugin by defining the plugin as "bar::foo", where "foo" is the artifact
+     * name and "bar" is the plugin name. An artifact name is useful for cases when a plugin is applied multiple times
+     * in a single projection. The artifact name changes the directory of where the plugin writes files. A plugin
+     * implementation should use the plugin name as the artifact name if no explicit artifact name is provided.
+     *
+     * @return Returns the optional artifact name.
+     */
+    public Optional<String> getArtifactName() {
+        return Optional.ofNullable(artifactName);
     }
 
     /**
@@ -239,15 +243,17 @@ public final class PluginContext implements ToSmithyBuilder<PluginContext> {
 
     @Override
     public Builder toBuilder() {
-        return builder()
-                .projection(projectionName, projection)
+        Builder builder = builder()
                 .model(model)
-                .originalModel(originalModel)
                 .events(events)
                 .settings(settings)
                 .fileManifest(fileManifest)
                 .pluginClassLoader(pluginClassLoader)
-                .sources(sources);
+                .sources(sources)
+                .artifactName(artifactName);
+        getProjection().ifPresent(config -> builder.projection(projectionName, config));
+        getOriginalModel().ifPresent(builder::originalModel);
+        return builder;
     }
 
     /**
@@ -262,7 +268,8 @@ public final class PluginContext implements ToSmithyBuilder<PluginContext> {
         private ObjectNode settings = Node.objectNode();
         private FileManifest fileManifest;
         private ClassLoader pluginClassLoader;
-        private Set<Path> sources = Collections.emptySet();
+        private BuilderRef<Set<Path>> sources = BuilderRef.forOrderedSet();
+        private String artifactName;
 
         private Builder() {}
 
@@ -354,14 +361,29 @@ public final class PluginContext implements ToSmithyBuilder<PluginContext> {
         }
 
         /**
-         * Sets the path to models that are considered "source" models of the
+         * Replaces the path to models that are considered "source" models of the
          * package being built.
          *
          * @param sources Source models to set.
          * @return Returns the builder.
          */
         public Builder sources(Collection<Path> sources) {
-            this.sources = new HashSet<>(sources);
+            this.sources.clear();
+            this.sources.get().addAll(sources);
+            return this;
+        }
+
+        /**
+         * Set a custom artifact name used to change the output directory of a plugin.
+         *
+         * <p>An artifact name is useful when running plugins like "run" or when running a plugin multiple times
+         * in a single projection.
+         *
+         * @param artifactName Custom artifact name to set.
+         * @return Returns the builder.
+         */
+        public Builder artifactName(String artifactName) {
+            this.artifactName = artifactName;
             return this;
         }
     }
